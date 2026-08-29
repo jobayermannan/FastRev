@@ -1,0 +1,113 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String   @map("password_hash")
+  role           String   @default("patient") // admin | doctor | patient
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  patient        Patient?
+  doctor         Doctor?
+  enrolledPatients Patient[] @relation("EnrolledBy")
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model Patient {
+  id                  String    @id @default(uuid())
+  userId              String?   @unique @map("user_id")
+  enrolledByAdminId   String    @map("enrolled_by_admin_id")
+  name                String
+  phone               String
+  dateOfBirth         DateTime @db.Date @map("date_of_birth")
+  priorNoShowCount    Int       @default(0) @map("prior_no_show_count")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  user                User?          @relation(fields: [userId], references: [id])
+  enrolledBy          User           @relation("EnrolledBy", fields: [enrolledByAdminId], references: [id])
+   appointments        Appointment[]
+
+  @@index([userId])
+  @@index([enrolledByAdminId])
+  @@map("patients")
+}
+
+model Doctor {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  specialty String
+
+  user      User           @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+
+  @@map("doctors")
+}
+
+model Appointment {
+  id          String    @id @default(uuid())
+  patientId   String    @map("patient_id")
+  doctorId    String    @map("doctor_id")
+  scheduledAt DateTime  @db.DateTime(0) @map("scheduled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  status      String    @default("booked") // booked | confirmed | completed | no_show | cancelled
+
+  patient     Patient         @relation(fields: [patientId], references: [id])
+  doctor      Doctor          @relation(fields: [doctorId], references: [id])
+  prediction  Prediction?
+  notifications Notification[]
+
+  @@unique([doctorId, scheduledAt])
+  @@index([patientId])
+  @@map("appointments")
+}
+
+model Prediction {
+  id                  String   @id @default(uuid())
+  appointmentId       String   @unique @map("appointment_id")
+  noShowProbability   Float     @map("no_show_probability")
+  riskLevel           String    @default("unknown") // low | high | unknown
+  modelVersion        String    @map("model_version")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  appointment         Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@map("predictions")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  appointmentId String @map("appointment_id")
+  channel     String   // sms | email
+  type        String   // standard_reminder | high_risk_reminder
+  status      String   @default("queued") // queued | sent | failed
+  sentAt      DateTime? @map("sent_at")
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String
+  entity    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("audit_logs")
+}
