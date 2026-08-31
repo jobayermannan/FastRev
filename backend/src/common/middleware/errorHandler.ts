@@ -38,7 +38,7 @@ export const errorHandler = (
     message: 'Internal server error',
     error: {
       code: 'INTERNAL_ERROR',
-      details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined,
+      details: undefined,
     },
   });
 };

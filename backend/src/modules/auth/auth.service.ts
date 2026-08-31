@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../../common/prisma';
 import { env } from '../../common/config/env';
+import { AppError } from '../../common/middleware/errorHandler';
 
 export interface TokenPayload {
   userId: string;
@@ -17,7 +18,7 @@ export function generateToken(user: { id: string; role: string }) {
 export async function registerUser(data: { email: string; password: string; role: string }) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) {
-    throw new Error('User with this email already exists');
+    throw new AppError(409, 'User with this email already exists');
   }
 
   const passwordHash = await bcrypt.hash(data.password, 12);
@@ -41,12 +42,12 @@ export async function registerUser(data: { email: string; password: string; role
 export async function loginUser(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    throw new Error('Invalid email or password');
+    throw new AppError(401, 'Invalid email or password');
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    throw new Error('Invalid email or password');
+    throw new AppError(401, 'Invalid email or password');
   }
 
   return {
