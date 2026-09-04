@@ -21,11 +21,15 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
-COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY prisma ./prisma
+COPY docker-entrypoint.sh /app/
+
+RUN npx prisma generate
+
+RUN chmod +x /app/docker-entrypoint.sh
 
 ENV NODE_ENV=production
 EXPOSE 4000
 
-CMD ["node", "dist/server.js"]
+CMD ["./docker-entrypoint.sh"]

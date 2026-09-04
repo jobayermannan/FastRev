@@ -17,6 +17,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7.4-alpine
@@ -29,6 +30,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   backend:
     build:
@@ -48,7 +50,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+    command: ./docker-entrypoint.sh
     restart: unless-stopped
 
   worker:
