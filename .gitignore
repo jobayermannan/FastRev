@@ -9,3 +9,6 @@ build
 coverage
 .vscode
 .idea
+ai-service/data/*.csv
+ai-service/models/*.joblib
+ai-service/models/*.json

@@ -3,9 +3,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { requestId } from './common/middleware/requestId';
-import { errorHandler } from './common/middleware/errorHandler';
+import { AppError, errorHandler } from './common/middleware/errorHandler';
 import { authLimiter } from './common/middleware/rateLimiter';
 import authRoutes from './modules/auth/auth.routes';
+import patientsRoutes from './modules/patients/patients.routes';
+import doctorsRoutes from './modules/doctors/doctors.routes';
+import appointmentsRoutes from './modules/appointments/appointments.routes';
 import { env } from './common/config/env';
 import { logger } from './common/logger';
 
@@ -20,15 +23,16 @@ export function createApp() {
   app.use(express.urlencoded({ extended: true }));
 
   app.use('/api/v1/auth', authLimiter, authRoutes);
+  app.use('/api/v1/patients', patientsRoutes);
+  app.use('/api/v1/doctors', doctorsRoutes);
+  app.use('/api/v1/appointments', appointmentsRoutes);
 
   app.get('/health', (_req, res) => {
     res.json({ success: true, data: { status: 'ok', env: env.NODE_ENV } });
   });
 
   app.use((_req, _res, next) => {
-    const err = new Error('Not Found') as any;
-    err.statusCode = 404;
-    next(err);
+    next(new AppError(404, 'Not Found'));
   });
 
   app.use(errorHandler);

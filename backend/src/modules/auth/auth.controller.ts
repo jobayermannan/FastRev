@@ -6,7 +6,7 @@ import { AppError } from '../../common/middleware/errorHandler';
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(['admin', 'doctor', 'patient']).default('patient'),
+  role: z.literal('patient').optional(),
 });
 
 const loginSchema = z.object({

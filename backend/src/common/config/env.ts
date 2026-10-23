@@ -9,6 +9,7 @@ const envSchema = z.object({
   AI_SERVICE_URL: z.string().url(),
   AI_PREDICT_TIMEOUT_MS: z.coerce.number().default(3000),
   REDIS_URL: z.string().url(),
+  SMS_PROVIDER: z.enum(['console']).default('console'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
   LOG_LEVEL: z.string().default('info'),

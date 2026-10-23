@@ -20,5 +20,8 @@ while [ $attempt -le $MAX_RETRIES ]; do
   attempt=$((attempt + 1))
 done
 
+echo "Bootstrapping administrator if configured..."
+node dist/bootstrap-admin.js
+
 echo "Starting application..."
 exec node dist/server.js
