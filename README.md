@@ -8,9 +8,9 @@
 
 Healthcare no-show rates average ~27% industry-wide, costing independent practices an estimated $150K–$1M/year in lost revenue. AI-driven prediction and reminder systems have been shown to cut no-shows by 40%+ in real deployments. FastRev is a from-scratch build of that idea: a working system, not a slide deck.
 
-## Status: 🚧 Backend and AI complete, frontend not started
+## Status: 🚧 MVP complete, not production-ready
 
-The whole server side is built — API, prediction service, trained model, and background worker. What's missing is the UI and an end-to-end run against live infrastructure.
+The whole system runs end to end: API, prediction service, trained model, background worker, and a React dashboard for clinic staff. What's missing before real use is a live SMS provider and a model trained on real clinic data.
 
 | Component | Status |
 |---|---|
@@ -22,15 +22,16 @@ The whole server side is built — API, prediction service, trained model, and b
 | No-show prediction service (FastAPI + trained XGBoost) | ✅ Done |
 | Notification worker (reminder scheduling, retry queues) | ✅ Done |
 | Unit / API tests (Vitest, unittest) | ✅ Done |
-| End-to-end verification against live MySQL + Redis | ⏳ Not yet run |
+| End-to-end verification against live MySQL + Redis | ✅ Done (68 checks) |
+| Frontend (React dashboard: login, dashboard, appointments, patients, doctors) | ✅ Done |
+| CI (GitHub Actions: backend, AI service, frontend) | ✅ Done |
 | Real SMS provider adapter (only a `console` provider exists) | ⏳ Planned |
-| Frontend (React dashboard) | ⏳ Not started |
-| CI/CD | ⏳ Planned |
+| Deployment (CD) | ⏳ Planned |
 
 Two things to be explicit about:
 
 - **The model's metrics are from synthetic data only.** The current XGBoost run scores F1 0.42 / ROC-AUC 0.69 on 12,000 generated rows ([`docs/model-evaluation.md`](docs/model-evaluation.md)). That is a working pipeline, not a claim about clinical accuracy.
-- **Nothing is verified end to end yet.** Tests pass at the unit and API level, but the migrations, Redis queues, and the full booking→risk→reminder flow have not been exercised against running containers.
+- **No real SMS is sent.** Reminders are scheduled, queued and "delivered" through a `console` provider that only logs them, until a real provider is chosen.
 
 See [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md) for the full architecture, database schema, and build order, and [`docs/adr/`](docs/adr) for the reasoning behind major technical decisions.
 
@@ -38,7 +39,7 @@ See [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md) for the full architecture, databa
 
 ```
 React Frontend → Node.js API (Express, modular) → MySQL (Prisma)
-    (planned)              ↓                           ↓
+                           ↓                           ↓
               Python AI Service (FastAPI)      Redis (queue + cache)
                                                        ↓
                                           Notification Worker (BullMQ)
@@ -53,7 +54,7 @@ A modular monolith for the core app, with the ML workload and background jobs de
 - **The model degrades instead of failing.** The FastAPI service loads a versioned joblib artifact at startup; if it is missing or inference throws, it falls back to a deterministic `rule-v1` scoring rule and reports which source it used. A failed re-score never erases a score an appointment already has.
 - **New patients aren't guessed at.** A patient with no recorded show or no-show is labelled `new_patient` instead of getting an AI score. Once their first visit has an outcome, their upcoming appointments are re-scored automatically.
 - **Attendance drives the score.** Marking a visit `completed` or `no_show` updates the patient's history and re-scores their upcoming appointments. Appointments whose start time has passed without an outcome are flagged `needsOutcome` so staff record what happened; the system never assumes a no-show.
-- **Reminders are queued, never sent inline.** High-risk appointments get two reminders (48h and 4h before), everything else gets one at 24h — plus an extra 48h one for a new patient who booked 14+ days ahead. Cancelling an appointment cancels its pending reminders.
+- **Reminders are queued, never sent inline.** High-risk appointments get two reminders (48h and 4h before), everything else gets one at 24h — plus an extra 48h one for a new patient who booked 14+ days ahead. When a re-score changes the plan, reminders from the old plan are cancelled; cancelling an appointment cancels all of its pending reminders.
 
 ## Tech Stack
 
@@ -62,7 +63,7 @@ A modular monolith for the core app, with the ML workload and background jobs de
 - **Queue/Cache:** Redis, BullMQ
 - **AI Service:** Python, FastAPI, scikit-learn, XGBoost
 - **Testing:** Vitest + Supertest (backend), unittest (AI service)
-- **Frontend:** React, Vite, Redux Toolkit (planned)
+- **Frontend:** React 18, Vite, Redux Toolkit + RTK Query, React Router
 - **Infra:** Docker, Docker Compose
 
 ## API
@@ -88,7 +89,7 @@ All protected routes take `Authorization: Bearer <token>`.
 
 The AI service exposes `GET /health` and `POST /predict/no-show-risk` on its own container — internal to the Compose network, not published to the host.
 
-`GET /api/v1/appointments` filters: `status`, `riskLevel` (`low`, `high`, `unknown`, `new_patient`), `from`/`to`, and `needsOutcome=true|false`. Every appointment in a response carries a `needsOutcome` flag, and the patient risk profile reports `isNewPatient`, completed visits, no-shows, a no-show rate over visits with an outcome, and `awaitingOutcome`.
+`GET /api/v1/appointments` filters: `status` (one value or a comma-separated list, e.g. `booked,confirmed`), `riskLevel` (`low`, `high`, `unknown`, `new_patient`), `from`/`to`, `needsOutcome=true|false`, and `order=asc|desc` by appointment time (default `desc`). Every appointment in a response carries a `needsOutcome` flag, and the patient risk profile reports `isNewPatient`, completed visits, no-shows, a no-show rate over visits with an outcome, and `awaitingOutcome`.
 
 Appointment status flow: `booked → confirmed → completed` or `no_show`; cancellation is allowed from `booked` or `confirmed`. Marking a patient `no_show` increments their history and re-queues risk scores for their upcoming appointments. Patient enrollment and booking both accept an optional `Idempotency-Key` header.
 
@@ -114,7 +115,17 @@ cd fastrev
 docker compose up -d --build
 ```
 
-The API runs on `http://localhost:4000` and the frontend container on `http://localhost:3000` — currently serving a placeholder page, since there is no frontend source yet. The AI service image trains the model during the build, so the container always ships with an artifact.
+Open the dashboard at `http://localhost:3000` and sign in with the bootstrap admin; the API runs on `http://localhost:4000`. The frontend image bakes in `VITE_API_URL` (default `http://localhost:4000/api/v1`) at build time — set it in the root `.env` if the API lives elsewhere, then rebuild. The AI service image trains the model during the build, so the container always ships with an artifact.
+
+On Windows, if Docker Desktop crash-loops with *"The file cannot be accessed by the system"*, it is stuck on stale socket files from an earlier crash ([desktop-feedback#625](https://github.com/docker/desktop-feedback/issues/625)): quit it, move `%LOCALAPPDATA%\Docker\run` and `%LOCALAPPDATA%\docker-secrets-engine` aside, and start it again from the Start menu.
+
+For frontend development with hot reload, run the API stack in Docker and Vite locally:
+
+```bash
+cd frontend
+npm ci
+npm run dev   # http://localhost:5173
+```
 
 For backend development outside Docker (see [`backend/.env.example`](backend/.env.example), and point `DATABASE_URL` at a database you own):
 
@@ -152,11 +163,10 @@ This project is being built with AI-assisted development (Kilo Code for scaffold
 
 ## Roadmap
 
-1. Verify migrations, the Redis worker, and the full booking→risk→reminder flow against running containers and a dedicated test database.
-2. Add a real SMS provider adapter behind the existing provider-neutral interface, with patient consent and opt-out.
-3. Build the React + Vite frontend: admin login, patient and doctor management, booking, appointment list with risk badges, patient risk profile.
-4. Replace synthetic training data with de-identified consented historical data; add calibration and drift monitoring.
-5. CI, linting, and a root `.env.example`.
+1. Add a real SMS provider adapter behind the existing provider-neutral interface, with patient consent and opt-out — then record replies ("1 to confirm, 2 to cancel") as a no-show signal.
+2. Replace synthetic training data with de-identified consented historical data; add calibration and drift monitoring.
+3. Deployment (CD), linting, a root `.env.example`, and frontend tests.
+4. Screens for the doctor role beyond read-only patients.
 
 ## License
 

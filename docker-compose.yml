@@ -88,10 +88,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # The browser calls the API directly, so this is the host-facing address, not the internal one.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/api/v1}
     ports:
       - "3000:80"
-    environment:
-      - VITE_API_URL=http://localhost:4000/api/v1
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:
