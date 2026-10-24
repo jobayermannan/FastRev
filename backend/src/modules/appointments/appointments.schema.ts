@@ -12,11 +12,13 @@ export const createAppointmentSchema = z.object({
 });
 
 export const appointmentQuerySchema = paginationSchema.extend({
-  status: appointmentStatusSchema.optional(),
+  // One status or a comma-separated list, e.g. `booked,confirmed` for appointments still open.
+  status: z.string().transform((value) => value.split(',')).pipe(z.array(appointmentStatusSchema).min(1)).optional(),
   riskLevel: z.enum(['low', 'high', 'unknown', 'new_patient']).optional(),
   from: dateTime.optional(),
   to: dateTime.optional(),
   needsOutcome: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+  order: z.enum(['asc', 'desc']).default('desc'),
 });
 
 export const updateAppointmentStatusSchema = z.object({ status: appointmentStatusSchema });

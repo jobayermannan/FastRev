@@ -178,14 +178,28 @@ describe('appointments awaiting an outcome', () => {
     expect((await getAppointmentById('done')).needsOutcome).toBe(false);
   });
 
+  it('accepts several statuses at once', async () => {
+    const { appointmentQuerySchema } = await import('../src/modules/appointments/appointments.schema');
+    mockPrisma.appointment.findMany.mockResolvedValue([]);
+    mockPrisma.appointment.count.mockResolvedValue(0);
+
+    await getAppointments(appointmentQuerySchema.parse({ status: 'booked,confirmed' }));
+
+    expect(mockPrisma.appointment.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { status: { in: ['booked', 'confirmed'] } },
+    }));
+    expect(() => appointmentQuerySchema.parse({ status: 'booked,bogus' })).toThrow();
+  });
+
   it('filters the list to open appointments that have already started', async () => {
     mockPrisma.appointment.findMany.mockResolvedValue([]);
     mockPrisma.appointment.count.mockResolvedValue(0);
 
-    await getAppointments({ page: 1, limit: 20, needsOutcome: true });
+    await getAppointments({ page: 1, limit: 20, needsOutcome: true, order: 'asc' });
 
     expect(mockPrisma.appointment.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { AND: [{ status: { in: ['booked', 'confirmed'] }, scheduledAt: { lte: expect.any(Date) } }] },
+      orderBy: [{ scheduledAt: 'asc' }, { id: 'asc' }],
     }));
   });
 });

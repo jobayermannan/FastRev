@@ -202,6 +202,7 @@ fastrev/
    - `risk_level = 'high'`: two reminders — 48 hours and 4 hours before appointment.
    - `risk_level = 'unknown'`: treat as default/low — never let missing AI data suppress the standard reminder.
    - `risk_level = 'new_patient'`: the standard 24-hour reminder; if booked 14+ days ahead, an extra reminder 48 hours before, since booking lead time is the one signal available without history.
+   - When a re-score changes the risk level, pending reminders that are no longer in the new plan are cancelled (and their queued jobs removed); a reminder that returns to the plan is re-queued.
    - All sends go through the notification worker (queued, not sent synchronously from the API request) so a slow SMS provider never blocks a user-facing API call.
    - Every notification attempt is logged with status (`sent`, `failed`, `retrying`) — retry up to 3 times with exponential backoff, then mark `failed` and surface it on the admin dashboard.
 

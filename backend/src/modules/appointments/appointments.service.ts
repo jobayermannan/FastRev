@@ -117,9 +117,9 @@ export async function createAppointment(input: CreateAppointmentInput, idempoten
 }
 
 export async function getAppointments(query: AppointmentQuery) {
-  const { page, limit, status, riskLevel, from, to, needsOutcome } = query;
+  const { page, limit, status, riskLevel, from, to, needsOutcome, order } = query;
   const where: Prisma.AppointmentWhereInput = {};
-  if (status) where.status = status;
+  if (status) where.status = { in: status };
   if (riskLevel) where.prediction = { is: { riskLevel } };
   if (from || to) where.scheduledAt = {
     ...(from ? { gte: new Date(from) } : {}),
@@ -133,7 +133,7 @@ export async function getAppointments(query: AppointmentQuery) {
   const [rows, total] = await Promise.all([
     prisma.appointment.findMany({
       where, skip: (page - 1) * limit, take: limit,
-      orderBy: [{ scheduledAt: 'desc' }, { id: 'desc' }], select: appointmentSelect,
+      orderBy: [{ scheduledAt: order }, { id: order }], select: appointmentSelect,
     }),
     prisma.appointment.count({ where }),
   ]);

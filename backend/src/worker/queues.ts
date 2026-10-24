@@ -63,6 +63,15 @@ export async function enqueueNotificationDelivery(notificationId: string, delay:
   );
 }
 
+// Removes a reminder's pending job; a job already being processed is left to see the cancelled status.
+export async function removeNotificationDelivery(notificationId: string) {
+  try {
+    await getNotificationQueue().remove(`notification-${notificationId}`);
+  } catch {
+    // An active job is locked and cannot be removed; delivery re-checks the status before sending.
+  }
+}
+
 export async function closeQueues() {
   await Promise.all([
     predictionRetryQueue?.close(),
