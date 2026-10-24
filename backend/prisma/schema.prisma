@@ -26,11 +26,14 @@ model User {
 model Patient {
   id                  String    @id @default(uuid())
   userId              String?   @unique @map("user_id")
+  idempotencyKey      String?   @unique @map("idempotency_key")
   enrolledByAdminId   String    @map("enrolled_by_admin_id")
   name                String
   phone               String
   dateOfBirth         DateTime @db.Date @map("date_of_birth")
   priorNoShowCount    Int       @default(0) @map("prior_no_show_count")
+  completedAppointmentCount Int @default(0) @map("completed_appointment_count")
+  totalAppointmentCount Int      @default(0) @map("total_appointment_count")
   createdAt           DateTime  @default(now()) @map("created_at")
 
   user                User?          @relation(fields: [userId], references: [id])
@@ -58,6 +61,9 @@ model Appointment {
   patientId   String    @map("patient_id")
   doctorId    String    @map("doctor_id")
   scheduledAt DateTime  @db.DateTime(0) @map("scheduled_at")
+  durationMinutes Int   @default(30) @map("duration_minutes")
+  activeSlotKey String?  @unique @map("active_slot_key")
+  idempotencyKey String? @unique @map("idempotency_key")
   createdAt   DateTime  @default(now()) @map("created_at")
   status      String    @default("booked") // booked | confirmed | completed | no_show | cancelled
 
@@ -66,7 +72,7 @@ model Appointment {
   prediction  Prediction?
   notifications Notification[]
 
-  @@unique([doctorId, scheduledAt])
+  @@index([doctorId, scheduledAt])
   @@index([patientId])
   @@map("appointments")
 }
@@ -74,8 +80,8 @@ model Appointment {
 model Prediction {
   id                  String   @id @default(uuid())
   appointmentId       String   @unique @map("appointment_id")
-  noShowProbability   Float     @map("no_show_probability")
-  riskLevel           String    @default("unknown") // low | high | unknown
+  noShowProbability   Float?    @map("no_show_probability")
+  riskLevel           String    @default("unknown") // low | high | unknown | new_patient
   modelVersion        String    @map("model_version")
   createdAt           DateTime  @default(now()) @map("created_at")
 
@@ -86,12 +92,17 @@ model Prediction {
 }
 
 model Notification {
-  id          String   @id @default(uuid())
-  appointmentId String @map("appointment_id")
-  channel     String   // sms | email
-  type        String   // standard_reminder | high_risk_reminder
-  status      String   @default("queued") // queued | sent | failed
-  sentAt      DateTime? @map("sent_at")
+  id                String    @id @default(uuid())
+  appointmentId     String    @map("appointment_id")
+  dedupeKey         String?   @unique @map("dedupe_key")
+  channel           String    // sms | email
+  type              String    // standard_reminder | high_risk_reminder
+  status            String    @default("queued") // queued | retrying | sent | failed | cancelled
+  scheduledAt       DateTime? @db.DateTime(0) @map("scheduled_at")
+  sentAt            DateTime? @map("sent_at")
+  attempts          Int       @default(0)
+  errorMessage      String?   @map("error_message")
+  providerMessageId String?   @map("provider_message_id")
 
   appointment Appointment @relation(fields: [appointmentId], references: [id])
 

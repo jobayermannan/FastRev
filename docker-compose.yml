@@ -21,8 +21,6 @@ services:
 
   redis:
     image: redis:7.4-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -45,6 +43,8 @@ services:
       - AI_SERVICE_URL=${AI_SERVICE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRY=${JWT_EXPIRY}
+      - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-}
+      - BOOTSTRAP_ADMIN_PASSWORD=${BOOTSTRAP_ADMIN_PASSWORD:-}
     depends_on:
       mysql:
         condition: service_healthy
@@ -62,6 +62,8 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - AI_SERVICE_URL=${AI_SERVICE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRY=${JWT_EXPIRY}
     depends_on:
       mysql:
         condition: service_healthy
@@ -73,12 +75,8 @@ services:
     build:
       context: ./ai-service
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
     environment:
-      - MODEL_PATH=/app/models/no_show_model.pkl
-    volumes:
-      - ./ai-service/models:/app/models
+      - MODEL_PATH=/app/models/no_show_model.joblib
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
@@ -90,10 +88,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # The browser calls the API directly, so this is the host-facing address, not the internal one.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/api/v1}
     ports:
       - "3000:80"
-    environment:
-      - VITE_API_URL=http://localhost:4000/api/v1
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:

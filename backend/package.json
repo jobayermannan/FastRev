@@ -11,7 +11,7 @@
     "test": "vitest run",
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
-    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed": "node dist/bootstrap-admin.js",
     "worker": "ts-node-dev --respawn --transpile-only src/worker/notification.worker.ts"
   },
   "dependencies": {

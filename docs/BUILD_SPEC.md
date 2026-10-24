@@ -28,7 +28,7 @@ Every feature in this spec must trace back to reducing no-show-driven revenue lo
 
 **Alternatives considered:**
 - Full microservices per domain (Auth, Patient, Appointment, Notification, AI as 5 separate services with separate DBs) — rejected for this stage: adds significant operational complexity (service discovery, distributed transactions, network failure handling between every domain) without a real scale requirement to justify it. This would be "microservices for the CV," which this project explicitly avoids.
-- Single monolith including the AI/ML code in Node — rejected: Python has the ML ecosystem (scikit-learn, pandas); forcing ML into Node would mean reimplementing or badly wrapping that ecosystem.
+- Single monolith including the AI/ML code in Node — rejected: Python has the ML ecosystem (XGBoost, pandas); forcing ML into Node would mean reimplementing or badly wrapping that ecosystem.
 
 **Reasoning:** Two service boundaries (Node API+DB, Python AI service) already deliver the loose coupling and fault tolerance goals that matter in practice:
 - If the AI service is down, the core app (booking, patient records, admin) keeps working. Appointments are still created; they just don't get a risk score until the AI service is back (see §6 fault-tolerance rules).
@@ -72,10 +72,11 @@ Every feature in this spec must trace back to reducing no-show-driven revenue lo
                  └──────────────┘   └──────┬───────────┘
                             │              │
                  ┌──────────▼───┐   ┌──────▼───────────┐
-                 │ P ython AI     │   │ Notification      │
+                 │ Python AI     │   │ Notification      │
                  │ Service       │   │ Worker (BullMQ)   │
                  │ (FastAPI,     │   │ sends SMS/email   │
-                 │ no-show model)│   │ reminders          │
+                 │ XGBoost       │   │ reminders          │
+                 │ no-show model)│   │                   │
                  └───────────────┘   └────────────────────┘
 ```
 
@@ -162,7 +163,7 @@ fastrev/
 │   ├── app/
 │   │   ├── main.py                   (FastAPI app)
 │   │   ├── models/
-│   │   │   └── no_show_model.pkl     (trained artifact, versioned)
+│   │   │   └── no_show_model.pkl     (trained XGBoost artifact, versioned)
 │   │   ├── schemas.py                (pydantic request/response models)
 │   │   ├── predict.py
 │   │   └── health.py                 (GET /health — required)
@@ -191,23 +192,31 @@ fastrev/
    - On appointment creation, the backend calls `POST {AI_SERVICE_URL}/predict/no-show-risk` with a 3-second timeout.
    - **If the AI service responds:** store `no_show_probability` and `risk_level` in the `predictions` table, linked to the appointment.
    - **If the AI service times out, errors, or is unreachable:** do NOT fail the appointment creation. Log the failure, store a `predictions` row with `risk_level = 'unknown'`, and queue a retry job. The appointment booking API must always succeed independently of AI service health — this is the fault-tolerance guarantee described in ADR-001.
+   - **A failed re-score never erases a real score:** if the appointment already has a `low`/`high` prediction, it is kept and a retry is queued instead of overwriting it with `unknown`.
+   - **New patients are not scored:** a patient with no recorded show or no-show has no history, so the AI is not called. The prediction is stored as `risk_level = 'new_patient'` with a null probability.
+   - **Attendance outcomes refresh scores:** when an appointment is marked `completed` or `no_show`, the patient's history counter is updated (`completed_appointment_count` or `prior_no_show_count`) and their upcoming booked/confirmed appointments are re-scored in the background. The AI's `total_appointment_count` input is the number of visits with a recorded outcome, not every booking ever made.
+   - **Needs outcome:** an appointment still `booked`/`confirmed` after its start time has passed is flagged `needsOutcome = true` so staff record whether the patient came. The system never guesses `no_show` on its own.
 
 4. **Notification rules:**
    - `risk_level = 'low'`: one reminder, 24 hours before appointment.
    - `risk_level = 'high'`: two reminders — 48 hours and 4 hours before appointment.
    - `risk_level = 'unknown'`: treat as default/low — never let missing AI data suppress the standard reminder.
+   - `risk_level = 'new_patient'`: the standard 24-hour reminder; if booked 14+ days ahead, an extra reminder 48 hours before, since booking lead time is the one signal available without history.
+   - When a re-score changes the risk level, pending reminders that are no longer in the new plan are cancelled (and their queued jobs removed); a reminder that returns to the plan is re-queued.
    - All sends go through the notification worker (queued, not sent synchronously from the API request) so a slow SMS provider never blocks a user-facing API call.
    - Every notification attempt is logged with status (`sent`, `failed`, `retrying`) — retry up to 3 times with exponential backoff, then mark `failed` and surface it on the admin dashboard.
 
 5. **Idempotency:** All state-changing POST/PATCH endpoints that could plausibly be retried by a flaky client (appointment creation, patient enrollment) must accept an optional `Idempotency-Key` header; if a request with the same key was already processed, return the original result instead of creating a duplicate.
 
 6. **Consistent API response shape** (every endpoint, no exceptions):
-   ```json
-   { "success": true, "data": { }, "message": "..." }
-   { "success": false, "message": "...", "error": { "code": "...", "details": "..." } }
-   ```
+  ```json
+  { "success": true, "data": { }, "message": "..." }
+  { "success": false, "message": "...", "error": { "code": "...", "details": "..." } }
+  ```
 
----
+ 7. **Pagination, filtering, and search:** All GET list endpoints accept `?page=1&limit=20` (default limit 20, max 100), returning `{ success: true, data: [...], pagination: { page, limit, total, totalPages } }`. A shared helper in `backend/src/common/utils/pagination.ts` must be used for parsing and validating these query parameters. The Patients list endpoint must support `?search=` (matches `name` or `phone`, case-insensitive partial match) and `?sortBy=name|createdAt&order=asc|desc`. The Appointments list endpoint must support `?status=`, `?riskLevel=`, and date range filters (`?from=&to=`).
+
+ ---
 
 ## 7. Database Schema (source of truth — Prisma models)
 
@@ -239,6 +248,7 @@ erDiagram
         string phone
         date date_of_birth
         int prior_no_show_count
+        int completed_appointment_count
         datetime created_at
     }
     DOCTORS {
@@ -258,7 +268,7 @@ erDiagram
         string id PK
         string appointment_id FK "unique"
         float no_show_probability
-        string risk_level "low|high|unknown"
+        string risk_level "low|high|unknown|new_patient"
         string model_version
         datetime created_at
     }
@@ -295,7 +305,7 @@ Required indexes: `appointments(doctor_id, scheduled_at)`, `appointments(patient
 8. **Graceful shutdown:** on `SIGTERM`, stop accepting new requests, finish in-flight ones, close DB and Redis connections cleanly before exiting.
 9. **Rate limiting** on all public-facing auth routes (login, register) to prevent abuse.
 10. **Structured logging with a request ID** on every log line, so a single failing request can be traced end to end across API and worker logs.
-11. **Tests required before a feature is considered done:** at minimum one unit test (service logic) and one integration test (API endpoint) per module; the AI service requires a model-evaluation test that fails the build if accuracy/F1 drops below a defined threshold versus the last committed model.
+11. **Tests required before a feature is considered done:** at minimum one unit test (service logic) and one integration test (API endpoint) per module using Vitest + Supertest; the AI service requires a model-evaluation test that fails the build if accuracy/F1 drops below a defined threshold versus the last committed model.
 12. **CI must block merges** that fail lint, type-check, or tests — no exceptions, no "fix it later."
 
 ---
@@ -316,7 +326,7 @@ Required indexes: `appointments(doctor_id, scheduled_at)`, `appointments(patient
 2. Patients + Doctors modules (CRUD, admin-only enrollment for patients).
 3. Appointments module, including the double-booking constraint — write a test that proves two overlapping bookings for the same doctor are rejected.
 4. AI service skeleton: FastAPI `/predict/no-show-risk` returning a stub value, `/health` endpoint, Dockerfile. Wire the backend's `predictions.service.ts` to call it, including the timeout + fallback behavior — write a test that kills the AI service and proves appointment creation still succeeds.
-5. Train the real no-show model on synthetic data (`training/generate_synthetic_data.py` → `train.py` → `evaluate.py`, output to `docs/model-evaluation.md`), swap the stub for the real model.
+ 5. Train the real no-show model on synthetic data using XGBoost (primary) vs Logistic Regression (baseline) (`training/generate_synthetic_data.py` → `train.py` → `evaluate.py`, output to `docs/model-evaluation.md`), swap the stub for the real model. The evaluation must compare at least two models and report precision/recall/F1 for both.
 6. Notification worker: Redis + BullMQ, reminder scheduling rules from §6.4, retry logic.
 7. Frontend: auth, admin dashboard (patient list, today's high-risk appointments, simulated revenue-saved metric), patient dashboard (own appointments).
 8. Docker Compose wiring all five containers (frontend, backend, worker, ai-service, mysql, redis).

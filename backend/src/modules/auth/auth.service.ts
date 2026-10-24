@@ -15,7 +15,7 @@ export function generateToken(user: { id: string; role: string }) {
   });
 }
 
-export async function registerUser(data: { email: string; password: string; role: string }) {
+export async function registerUser(data: { email: string; password: string }) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) {
     throw new AppError(409, 'User with this email already exists');
@@ -26,7 +26,7 @@ export async function registerUser(data: { email: string; password: string; role
     data: {
       email: data.email,
       passwordHash,
-      role: data.role,
+      role: 'patient',
     },
     select: {
       id: true,
