@@ -1,5 +1,4 @@
-import type { FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import type { SerializedError } from '@reduxjs/toolkit';
+import { ApiError } from '@/lib/api/client';
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 // Dates of birth are calendar dates stored at UTC midnight; formatting them in UTC keeps the day from shifting.
@@ -21,7 +20,7 @@ export function ageFrom(dateOfBirth: string) {
 /** Converts a `datetime-local` input value to an ISO timestamp in the browser's time zone. */
 export const localInputToIso = (value: string) => new Date(value).toISOString();
 
-/** The current minute, as a `datetime-local` input value. */
+/** The current minute plus an offset, as a `datetime-local` input value. */
 export function nowForInput(offsetMinutes = 0) {
   const date = new Date(Date.now() + offsetMinutes * 60_000);
   date.setSeconds(0, 0);
@@ -29,19 +28,20 @@ export function nowForInput(offsetMinutes = 0) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/** Turns an RTK Query error into a sentence a clinic user can act on. */
-export function errorText(error: FetchBaseQueryError | SerializedError | undefined): string | null {
+export const isStatus = (error: unknown, status: number) => error instanceof ApiError && error.status === status;
+
+/** Turns an API error into a sentence a clinic user can act on. */
+export function errorText(error: unknown): string | null {
   if (!error) return null;
-  if ('status' in error) {
-    if (error.status === 'FETCH_ERROR') return 'Cannot reach the FastRev server. Check that the API is running.';
-    const body = error.data as { message?: string; error?: { details?: unknown } } | undefined;
-    const details = body?.error?.details;
+  if (error instanceof ApiError) {
+    if (error.status === 0) return 'Cannot reach the FastRev server. Check that the API is running.';
+    const details = (error.body as { error?: { details?: unknown } } | undefined)?.error?.details;
     if (Array.isArray(details) && details.length) {
       return details.map((d: { path?: string[]; message?: string }) =>
         `${d.path?.join('.') ?? 'field'}: ${d.message}`).join('; ');
     }
     if (error.status === 403) return 'Your account does not have permission for this.';
-    return body?.message ?? `Request failed (${error.status}).`;
+    return error.message;
   }
-  return error.message ?? 'Something went wrong.';
+  return error instanceof Error ? error.message : 'Something went wrong.';
 }

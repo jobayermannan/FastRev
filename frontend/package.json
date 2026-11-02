@@ -1,26 +1,28 @@
 {
   "name": "fastrev-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@reduxjs/toolkit": "^2.5.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-redux": "^9.2.0",
-    "react-router-dom": "^7.18.4"
+    "@tanstack/react-query": "^5.90.0",
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^6.1.2",
-    "typescript": "~5.6.3",
-    "vite": "^8.3.5"
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.20.0",
+    "eslint-config-next": "^16.0.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.0"
   }
 }

@@ -6,6 +6,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRY: z.string().default('24h'),
+  // Comma-separated browser origins allowed to call the API; unset reflects any origin (development default).
+  CORS_ORIGIN: z.string().optional(),
   AI_SERVICE_URL: z.string().url(),
   AI_PREDICT_TIMEOUT_MS: z.coerce.number().default(3000),
   REDIS_URL: z.string().url(),

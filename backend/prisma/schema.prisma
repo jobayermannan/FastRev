@@ -82,6 +82,7 @@ model Prediction {
   appointmentId       String   @unique @map("appointment_id")
   noShowProbability   Float?    @map("no_show_probability")
   riskLevel           String    @default("unknown") // low | high | unknown | new_patient
+  reasonCodes         Json?     @map("reason_codes") // AI explainability codes; null until provided
   modelVersion        String    @map("model_version")
   createdAt           DateTime  @default(now()) @map("created_at")
 

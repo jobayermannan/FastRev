@@ -16,7 +16,8 @@ export function createApp() {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: true, credentials: true }));
+  const allowedOrigins = env.CORS_ORIGIN?.split(',').map((origin) => origin.trim()).filter(Boolean);
+  app.use(cors({ origin: allowedOrigins?.length ? allowedOrigins : true, credentials: true }));
   app.use(requestId);
   app.use(morgan('combined'));
   app.use(express.json());

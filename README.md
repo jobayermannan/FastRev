@@ -10,7 +10,7 @@ Healthcare no-show rates average ~27% industry-wide, costing independent practic
 
 ## Status: 🚧 MVP complete, not production-ready
 
-The whole system runs end to end: API, prediction service, trained model, background worker, and a React dashboard for clinic staff. What's missing before real use is a live SMS provider and a model trained on real clinic data.
+The whole system runs end to end: API, prediction service, trained model, background worker, and a Next.js dashboard for clinic staff. What's missing before real use is a live SMS provider and a model trained on real clinic data.
 
 | Component | Status |
 |---|---|
@@ -23,8 +23,8 @@ The whole system runs end to end: API, prediction service, trained model, backgr
 | Notification worker (reminder scheduling, retry queues) | ✅ Done |
 | Unit / API tests (Vitest, unittest) | ✅ Done |
 | End-to-end verification against live MySQL + Redis | ✅ Done (68 checks) |
-| Frontend (React dashboard: login, dashboard, appointments, patients, doctors) | ✅ Done |
-| CI (GitHub Actions: backend, AI service, frontend) | ✅ Done |
+| Frontend (Next.js App Router dashboard: login, dashboard, appointments, patients, doctors) | ✅ Done |
+| CI (GitHub Actions: backend, AI service, frontend, workers) | ✅ Done |
 | Real SMS provider adapter (only a `console` provider exists) | ⏳ Planned |
 | Deployment (CD) | ⏳ Planned |
 
@@ -38,14 +38,14 @@ See [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md) for the full architecture, databa
 ## Architecture (short version)
 
 ```
-React Frontend → Node.js API (Express, modular) → MySQL (Prisma)
-                           ↓                           ↓
-              Python AI Service (FastAPI)      Redis (queue + cache)
-                                                       ↓
-                                          Notification Worker (BullMQ)
+Next.js Frontend → Node.js API (Express, modular) → MySQL (Prisma)
+                            ↓                           ↓
+               Python AI Service (FastAPI)      Redis (queue + cache)
+                                                        ↓
+                                           Notification Worker (BullMQ)
 ```
 
-A modular monolith for the core app, with the ML workload and background jobs deliberately split into their own services — see [ADR-001](docs/adr/ADR-001-modular-monolith.md) for why. MySQL was chosen over MongoDB for relational integrity (e.g. preventing double-booked doctors) — see [ADR-002](docs/adr/ADR-002-mysql-prisma.md). Tests run on Vitest — see [ADR-003](docs/adr/ADR-003-vitest-testing.md).
+A modular monolith for the core app, with the ML workload and background jobs deliberately split into their own services — see [ADR-001](docs/adr/ADR-001-modular-monolith.md) for why. MySQL was chosen over MongoDB for relational integrity (e.g. preventing double-booked doctors) — see [ADR-002](docs/adr/ADR-002-mysql-prisma.md). Tests run on Vitest — see [ADR-003](docs/adr/ADR-003-vitest-testing.md). Frontend migration to Next.js App Router + TanStack Query is detailed in [ADR-004](docs/adr/ADR-004-nextjs-app-router-tanstack-query.md).
 
 ### How the pieces behave
 
@@ -63,7 +63,7 @@ A modular monolith for the core app, with the ML workload and background jobs de
 - **Queue/Cache:** Redis, BullMQ
 - **AI Service:** Python, FastAPI, scikit-learn, XGBoost
 - **Testing:** Vitest + Supertest (backend), unittest (AI service)
-- **Frontend:** React 18, Vite, Redux Toolkit + RTK Query, React Router
+- **Frontend:** Next.js (App Router), React 19, TypeScript, Tailwind CSS, TanStack Query v5
 - **Infra:** Docker, Docker Compose
 
 ## API
@@ -97,7 +97,13 @@ The first admin account is created at startup from `BOOTSTRAP_ADMIN_EMAIL` / `BO
 
 ## Running Locally
 
-There is no root `.env.example` yet; create a root `.env` for Compose with these variables:
+Copy the root `.env.example` template:
+
+```bash
+cp .env.example .env
+```
+
+Review and adjust variables as needed:
 
 ```
 MYSQL_ROOT_PASSWORD=   MYSQL_DATABASE=   MYSQL_USER=   MYSQL_PASSWORD=
@@ -107,6 +113,7 @@ AI_SERVICE_URL=http://ai-service:8000
 JWT_SECRET=            # at least 32 characters
 JWT_EXPIRY=24h
 BOOTSTRAP_ADMIN_EMAIL= BOOTSTRAP_ADMIN_PASSWORD=   # optional, both or neither
+NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
 ```
 
 ```bash
@@ -115,16 +122,16 @@ cd fastrev
 docker compose up -d --build
 ```
 
-Open the dashboard at `http://localhost:3000` and sign in with the bootstrap admin; the API runs on `http://localhost:4000`. The frontend image bakes in `VITE_API_URL` (default `http://localhost:4000/api/v1`) at build time — set it in the root `.env` if the API lives elsewhere, then rebuild. The AI service image trains the model during the build, so the container always ships with an artifact.
+Open the dashboard at `http://localhost:3000` and sign in with the bootstrap admin; the API runs on `http://localhost:4000`. The frontend image bakes in `NEXT_PUBLIC_API_URL` (default `http://localhost:4000/api/v1`) at build time — set it in the root `.env` if the API lives elsewhere, then rebuild. The AI service image trains the model during the build, so the container always ships with an artifact.
 
 On Windows, if Docker Desktop crash-loops with *"The file cannot be accessed by the system"*, it is stuck on stale socket files from an earlier crash ([desktop-feedback#625](https://github.com/docker/desktop-feedback/issues/625)): quit it, move `%LOCALAPPDATA%\Docker\run` and `%LOCALAPPDATA%\docker-secrets-engine` aside, and start it again from the Start menu.
 
-For frontend development with hot reload, run the API stack in Docker and Vite locally:
+For frontend development with hot reload, run the API stack in Docker and Next.js locally:
 
 ```bash
 cd frontend
 npm ci
-npm run dev   # http://localhost:5173
+npm run dev   # http://localhost:3000
 ```
 
 For backend development outside Docker (see [`backend/.env.example`](backend/.env.example), and point `DATABASE_URL` at a database you own):
@@ -149,6 +156,14 @@ Database integration tests are skipped unless `FASTREV_TEST_DATABASE_URL` is set
 cd ai-service && python -m unittest discover -s tests -v
 ```
 
+```bash
+cd frontend && npm run typecheck && npm run lint && npm run build
+```
+
+```bash
+cd workers && npm run typecheck && npm run build
+```
+
 ### Retraining the model
 
 ```bash
@@ -165,7 +180,7 @@ This project is being built with AI-assisted development (Kilo Code for scaffold
 
 1. Add a real SMS provider adapter behind the existing provider-neutral interface, with patient consent and opt-out — then record replies ("1 to confirm, 2 to cancel") as a no-show signal.
 2. Replace synthetic training data with de-identified consented historical data; add calibration and drift monitoring.
-3. Deployment (CD), linting, a root `.env.example`, and frontend tests.
+3. Deployment (CD), linting, and comprehensive integration testing across microservices.
 4. Screens for the doctor role beyond read-only patients.
 
 ## License

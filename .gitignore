@@ -1,6 +1,10 @@
 node_modules
 dist
 build
+.next
+out
+.turbo
+next-env.d.ts
 .env
 .env.local
 .env.*.local
@@ -9,6 +13,8 @@ build
 coverage
 .vscode
 .idea
+.venv
+venv
 ai-service/data/*.csv
 ai-service/models/*.joblib
 ai-service/models/*.json
