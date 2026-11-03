@@ -22,6 +22,7 @@ The whole system runs end to end: API, prediction service, trained model, backgr
 | No-show prediction service (FastAPI + trained XGBoost) | ✅ Done |
 | Notification worker (reminder scheduling, retry queues) | ✅ Done |
 | Unit / API tests (Vitest, unittest) | ✅ Done |
+| Frontend tests (Vitest + Testing Library, 37 tests) | ✅ Done |
 | End-to-end verification against live MySQL + Redis | ✅ Done (68 checks) |
 | Frontend (Next.js App Router dashboard: login, dashboard, appointments, patients, doctors) | ✅ Done |
 | CI (GitHub Actions: backend, AI service, frontend, workers) | ✅ Done |
