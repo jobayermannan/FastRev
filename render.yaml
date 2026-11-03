@@ -1,4 +1,10 @@
-# Render Blueprint: the API, the queue worker and the prediction service.
+# Render Blueprint, on free plans.
+#
+# What that costs the architecture: Render has no free background worker, so the API runs the
+# BullMQ consumers in its own process (RUN_WORKERS_IN_PROCESS). Compose still runs them as their
+# own container, and moving them back here is one service block and a plan change. Free web
+# services also sleep after 15 minutes idle, so the first request after a quiet spell is slow and
+# nothing is consumed from the queues while the API is asleep.
 #
 # Not here, on purpose:
 #   - MySQL. Render has no managed MySQL, so the database is an external managed instance
@@ -17,7 +23,7 @@ services:
   - type: web
     name: fastrev-ai
     runtime: docker
-    plan: 0.5c-512mb
+    plan: free
     region: singapore
     dockerfilePath: ./ai-service/Dockerfile
     dockerContext: ./ai-service
@@ -32,7 +38,7 @@ services:
   - type: web
     name: fastrev-api
     runtime: docker
-    plan: 0.5c-512mb
+    plan: free
     region: singapore
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
@@ -40,6 +46,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # No free background worker exists, so the queues run here. See the note at the top.
+      - key: RUN_WORKERS_IN_PROCESS
+        value: 'true'
       # The managed MySQL instance; paste its connection string when creating the blueprint.
       - key: DATABASE_URL
         sync: false
@@ -64,28 +73,3 @@ services:
         sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
         sync: false
-
-  - type: worker
-    name: fastrev-worker
-    runtime: docker
-    plan: 0.5c-512mb
-    region: singapore
-    dockerfilePath: ./backend/Dockerfile.worker
-    dockerContext: ./backend
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: JWT_SECRET
-        fromService:
-          type: web
-          name: fastrev-api
-          envVarKey: JWT_SECRET
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: fastrev-redis
-          property: connectionString
-      - key: AI_SERVICE_URL
-        value: http://fastrev-ai:10000

@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { env } from './common/config/env';
 import { logger } from './common/logger';
 import prisma from './common/prisma';
+import { startWorkers } from './worker/notification.worker';
 
 const app = createApp();
 
@@ -15,9 +16,12 @@ async function start() {
       logger.info(`Server listening on port ${env.PORT}`);
     });
 
+    const stopWorkers = env.RUN_WORKERS_IN_PROCESS ? startWorkers() : null;
+
     const gracefulShutdown = async (signal: string) => {
       logger.info(`${signal} received, shutting down gracefully`);
       server.close(async () => {
+        await stopWorkers?.();
         await prisma.$disconnect();
         logger.info('Database disconnected');
         process.exit(0);
