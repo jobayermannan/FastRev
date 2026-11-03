@@ -21,3 +21,8 @@ ai-service/models/*.json
 __pycache__/
 *.pyc
 *.tsbuildinfo
+
+# A one-off `npm audit --json` dump, and a stray duplicate of the Prisma schema that
+# nothing reads; the real one is backend/prisma/schema.prisma.
+audit.json
+backend/src/prisma/
