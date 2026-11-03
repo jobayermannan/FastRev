@@ -10,7 +10,7 @@ services:
   - type: keyvalue
     name: fastrev-redis
     plan: free
-    region: oregon
+    region: singapore
     ipAllowList: []
     maxmemoryPolicy: noeviction
 
@@ -18,7 +18,7 @@ services:
     name: fastrev-ai
     runtime: docker
     plan: 0.5c-512mb
-    region: oregon
+    region: singapore
     dockerfilePath: ./ai-service/Dockerfile
     dockerContext: ./ai-service
     healthCheckPath: /health
@@ -33,7 +33,7 @@ services:
     name: fastrev-api
     runtime: docker
     plan: 0.5c-512mb
-    region: oregon
+    region: singapore
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health
@@ -69,7 +69,7 @@ services:
     name: fastrev-worker
     runtime: docker
     plan: 0.5c-512mb
-    region: oregon
+    region: singapore
     dockerfilePath: ./backend/Dockerfile.worker
     dockerContext: ./backend
     envVars:
