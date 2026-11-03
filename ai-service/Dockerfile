@@ -17,4 +17,5 @@ RUN python training/generate_synthetic_data.py --output /tmp/no_show_training.cs
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form so a platform-supplied PORT is honoured; 8000 is the Compose default.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

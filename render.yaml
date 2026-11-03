@@ -1,0 +1,91 @@
+# Render Blueprint: the API, the queue worker and the prediction service.
+#
+# Not here, on purpose:
+#   - MySQL. Render has no managed MySQL, so the database is an external managed instance
+#     (Aiven's free MySQL tier) and its URL is pasted into DATABASE_URL at deploy time.
+#   - The frontend. It is a Next.js app and belongs on Vercel, which builds it natively;
+#     the browser calls this API directly, so the two only meet through CORS_ORIGIN.
+services:
+  # BullMQ's queues. `noeviction` matters: an evicted job is a reminder that never goes out.
+  - type: keyvalue
+    name: fastrev-redis
+    plan: free
+    region: oregon
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  - type: web
+    name: fastrev-ai
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    dockerfilePath: ./ai-service/Dockerfile
+    dockerContext: ./ai-service
+    healthCheckPath: /health
+    envVars:
+      # Pinned so the API can address this service on the private network at a known port.
+      - key: PORT
+        value: 10000
+      - key: MODEL_PATH
+        value: /app/models/no_show_model.joblib
+
+  - type: web
+    name: fastrev-api
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # The managed MySQL instance; paste its connection string when creating the blueprint.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY
+        value: 24h
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: fastrev-redis
+          property: connectionString
+      # Private network address, which is why fastrev-ai pins its PORT.
+      - key: AI_SERVICE_URL
+        value: http://fastrev-ai:10000
+      # The Vercel origin, once the frontend is deployed. Unset reflects any origin, which this
+      # service must never do: it holds real sessions.
+      - key: CORS_ORIGIN
+        sync: false
+      # Creates the first admin on boot if no user owns the address. Set both or neither.
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+
+  - type: worker
+    name: fastrev-worker
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile.worker
+    dockerContext: ./backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: fastrev-api
+          envVarKey: JWT_SECRET
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: fastrev-redis
+          property: connectionString
+      - key: AI_SERVICE_URL
+        value: http://fastrev-ai:10000
