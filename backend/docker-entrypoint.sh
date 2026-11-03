@@ -1,8 +1,10 @@
 #!/bin/sh
 set -e
 
-MAX_RETRIES=5
-RETRY_DELAY=2
+# The managed database powers down when idle and takes up to a minute to accept
+# connections again, so boot waits that long before giving up.
+MAX_RETRIES=12
+RETRY_DELAY=10
 
 echo "Running database migrations..."
 attempt=1

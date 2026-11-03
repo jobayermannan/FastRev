@@ -128,4 +128,18 @@ describe('HTTP error responses', () => {
     expect(missing.status).toBe(404);
     expect(conflict.status).toBe(409);
   });
+
+  it('maps an unreachable database to 503, not 500', async () => {
+    // The managed instance powers down when idle; a caller should be told to wait, not that
+    // the server is broken.
+    mockPrisma.patient.findMany.mockRejectedValue(new Prisma.PrismaClientInitializationError(
+      "Can't reach database server", '5.22.0', 'P1001',
+    ));
+
+    const res = await request(app).get('/api/v1/patients')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`);
+
+    expect(res.status).toBe(503);
+    expect(res.body.message).toMatch(/waking up/i);
+  });
 });

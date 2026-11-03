@@ -59,6 +59,18 @@ export const errorHandler = (
     }
   }
 
+  // The managed database powers down when idle and takes a while to come back, so an
+  // unreachable database is a wait, not a fault: say so rather than returning a bare 500.
+  if (err instanceof Prisma.PrismaClientInitializationError && err.errorCode === 'P1001') {
+    logger.warn({ reqId: requestId }, 'Database unreachable');
+    const message = 'The database is waking up. Try again in a moment.';
+    return res.status(503).json({
+      success: false,
+      message,
+      error: { code: '503', details: message },
+    });
+  }
+
   const parserError = err as Error & { type?: string };
   if (parserError.type === 'entity.parse.failed') {
     logger.warn({ reqId: requestId }, 'Invalid request body');
