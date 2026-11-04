@@ -4,6 +4,33 @@
 
 > Predicts which patients are likely to miss their appointment, so clinics can send a targeted reminder or fill the slot with another patient — before the revenue is lost.
 
+## Live demo
+
+| | |
+|---|---|
+| Dashboard | https://fastrev.vercel.app |
+| API | https://fastrev-api.onrender.com/health |
+
+Sign in as `demo@fastrev.app`. The password is in the repository's release notes.
+
+Everything runs on free tiers, which shapes what you will see: the API and the
+prediction service sleep after 15 minutes of inactivity, so **the first request after
+a quiet spell takes 30-60 seconds** while they and the database wake up. The
+no-show model is trained on synthetic data, and the SMS provider is the `console`
+adapter — reminders are scheduled and recorded, not sent to a phone.
+
+Where each piece runs, and why:
+
+| Piece | Host | Why there |
+|---|---|---|
+| Next.js dashboard | Vercel | Builds it natively |
+| API, prediction service, Valkey | Render (Singapore) | Blueprint in `render.yaml` |
+| MySQL | Aiven (Bangalore) | Render has no managed MySQL |
+
+Render's free tier has no background worker, so the API runs the BullMQ consumers
+in its own process (`RUN_WORKERS_IN_PROCESS=true`). Compose and any paid plan keep
+the worker as its own container — the switch is one service block in `render.yaml`.
+
 ## The Problem
 
 Healthcare no-show rates average ~27% industry-wide, costing independent practices an estimated $150K–$1M/year in lost revenue. AI-driven prediction and reminder systems have been shown to cut no-shows by 40%+ in real deployments. FastRev is a from-scratch build of that idea: a working system, not a slide deck.
@@ -27,6 +54,7 @@ The whole system runs end to end: API, prediction service, trained model, backgr
 | Frontend (Next.js App Router dashboard: login, dashboard, appointments, patients, doctors) | ✅ Done |
 | CI (GitHub Actions: backend, AI service, frontend, workers) | ✅ Done |
 | Real SMS provider adapter (only a `console` provider exists) | ⏳ Planned |
+| Deployed (Vercel + Render + Aiven, free tiers) | ✅ Done |
 | Deployment (CD) | ⏳ Planned |
 
 Two things to be explicit about:
