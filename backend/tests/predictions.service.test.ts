@@ -80,4 +80,17 @@ describe('prediction persistence', () => {
     expect(result.prediction).toMatchObject({ riskLevel: 'new_patient', noShowProbability: null });
     expect(mockPost).not.toHaveBeenCalled();
   });
+
+  it('persists explainability reason codes returned by the AI service', async () => {
+    mockPost.mockResolvedValue({
+      data: { ...aiResponse, reason_codes: ['past_no_shows', 'long_lead_time'] },
+    });
+
+    const result = await scoreAppointment('appointment-1');
+
+    expect(result.prediction).toMatchObject({
+      riskLevel: 'high',
+      reasonCodes: ['past_no_shows', 'long_lead_time'],
+    });
+  });
 });

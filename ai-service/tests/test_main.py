@@ -30,6 +30,7 @@ class PredictionServiceTests(unittest.TestCase):
         result = predict_no_show(self.request(2, 2, 14))
         self.assertGreaterEqual(result.no_show_probability, 0.5)
         self.assertEqual(result.risk_level, "high")
+        self.assertEqual(result.reason_codes, ["past_no_shows", "long_lead_time"])
 
     @patch("app.main.load_model_artifact")
     def test_uses_trained_model_probability_when_available(self, mock_model):
@@ -52,6 +53,37 @@ class PredictionServiceTests(unittest.TestCase):
     def test_negative_history_is_rejected(self):
         with self.assertRaises(ValidationError):
             self.request(prior_no_show_count=-1)
+
+    @patch("app.main.load_model_artifact")
+    def test_ranks_trained_model_reason_codes_by_counterfactual_lift(self, mock_model):
+        class CounterfactualModel:
+            def predict_proba(self, features):
+                probs = []
+                for _, row in features.iterrows():
+                    p = 0.12 + 0.25 * (row["prior_no_show_count"] > 0) + 0.15 * (row["days_until_appointment"] >= 14)
+                    probs.append([1 - p, p])
+                return probs
+
+        mock_model.return_value = {
+            "model": CounterfactualModel(),
+            "metadata": {"model_version": "xgboost-v1", "classification_threshold": 0.30},
+        }
+
+        result = predict_no_show(self.request(prior_no_show_count=2, total_appointment_count=4, days_until_appointment=21))
+        self.assertEqual(result.risk_level, "high")
+        self.assertEqual(result.reason_codes, ["past_no_shows", "long_lead_time"])
+
+    def test_evaluation_pipeline_compares_against_baselines(self):
+        from training.evaluate import evaluate_dataset, render_markdown
+        from training.generate_synthetic_data import generate_dataset
+
+        summary = evaluate_dataset(generate_dataset(rows=600, seed=7))
+        self.assertIn("xgboost_v1", summary["comparison"])
+        self.assertIn("prevalence_baseline", summary["comparison"])
+        self.assertIn("rule_v1_emergency_050", summary["comparison"])
+        md = render_markdown(summary)
+        self.assertIn("ROC-AUC", md)
+        self.assertIn("PR-AUC", md)
 
 
 if __name__ == "__main__":

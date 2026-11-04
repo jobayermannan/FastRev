@@ -9,13 +9,23 @@ const predictResponseSchema = z.object({
   appointment_id: z.string(),
   no_show_probability: z.number().min(0).max(1),
   risk_level: z.enum(['low', 'high']),
+  reason_codes: z.array(z.string()).default([]),
   model_version: z.string().min(1),
 });
 
-type PredictionValues = { noShowProbability: number | null; riskLevel: string; modelVersion: string };
+type PredictionValues = {
+  noShowProbability: number | null;
+  riskLevel: string;
+  reasonCodes: string[];
+  modelVersion: string;
+};
 
-const NEW_PATIENT: PredictionValues = { noShowProbability: null, riskLevel: 'new_patient', modelVersion: 'new-patient' };
-const UNKNOWN: PredictionValues = { noShowProbability: null, riskLevel: 'unknown', modelVersion: 'unavailable' };
+const NEW_PATIENT: PredictionValues = {
+  noShowProbability: null, riskLevel: 'new_patient', reasonCodes: [], modelVersion: 'new-patient',
+};
+const UNKNOWN: PredictionValues = {
+  noShowProbability: null, riskLevel: 'unknown', reasonCodes: [], modelVersion: 'unavailable',
+};
 
 function ageOn(dateOfBirth: Date, scheduledAt: Date) {
   let age = scheduledAt.getUTCFullYear() - dateOfBirth.getUTCFullYear();
@@ -66,6 +76,7 @@ export async function scoreAppointment(appointmentId: string) {
     const prediction = await save({
       noShowProbability: parsed.no_show_probability,
       riskLevel: parsed.risk_level,
+      reasonCodes: parsed.reason_codes,
       modelVersion: parsed.model_version,
     });
     return { prediction, needsRetry: false };
