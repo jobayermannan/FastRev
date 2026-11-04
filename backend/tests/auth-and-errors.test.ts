@@ -142,4 +142,22 @@ describe('HTTP error responses', () => {
     expect(res.status).toBe(503);
     expect(res.body.message).toMatch(/waking up/i);
   });
+
+  it('maps database timeouts and initialization errors without an errorCode to 503', async () => {
+    mockPrisma.patient.findMany.mockRejectedValueOnce(new Prisma.PrismaClientInitializationError(
+      'Connection terminated unexpectedly', '5.22.0',
+    ));
+    const initRes = await request(app).get('/api/v1/patients')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`);
+
+    mockPrisma.patient.findMany.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError(
+      'Timed out', { code: 'P1002', clientVersion: '5.22.0' },
+    ));
+    const timeoutRes = await request(app).get('/api/v1/patients')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`);
+
+    expect(initRes.status).toBe(503);
+    expect(timeoutRes.status).toBe(503);
+    expect(timeoutRes.body.error.code).toBe('503');
+  });
 });

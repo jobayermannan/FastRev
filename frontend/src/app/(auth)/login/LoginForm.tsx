@@ -15,11 +15,21 @@ export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [slowStart, setSlowStart] = useState(false);
   const user = auth.status === 'ready' ? auth.session?.user : undefined;
 
   useEffect(() => {
     if (user) router.replace(homeFor(user.role));
   }, [user, router]);
+
+  useEffect(() => {
+    if (!login.isPending) return;
+    const timer = setTimeout(() => setSlowStart(true), 4000);
+    return () => {
+      clearTimeout(timer);
+      setSlowStart(false);
+    };
+  }, [login.isPending]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -59,6 +69,11 @@ export function LoginForm() {
           <button className="btn btn-primary w-full" type="submit" disabled={login.isPending}>
             {login.isPending ? 'Signing in…' : 'Sign in'}
           </button>
+          {login.isPending && slowStart && (
+            <p className="meta mt-3" role="status">
+              Waking up the server and database — the first sign-in after idle can take up to a minute.
+            </p>
+          )}
         </div>
       </form>
     </div>
