@@ -64,10 +64,10 @@ services:
       # Private network address, which is why fastrev-ai pins its PORT.
       - key: AI_SERVICE_URL
         value: http://fastrev-ai:10000
-      # The Vercel origin, once the frontend is deployed. Unset reflects any origin, which this
-      # service must never do: it holds real sessions.
+      # The Vercel origin. Unset reflects any origin, which this service must never do:
+      # it holds real sessions.
       - key: CORS_ORIGIN
-        sync: false
+        value: https://fastrev.vercel.app
       # Creates the first admin on boot if no user owns the address. Set both or neither.
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
