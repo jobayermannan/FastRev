@@ -11,6 +11,11 @@
 #     (Aiven's free MySQL tier) and its URL is pasted into DATABASE_URL at deploy time.
 #   - The frontend. It is a Next.js app and belongs on Vercel, which builds it natively;
 #     the browser calls this API directly, so the two only meet through CORS_ORIGIN.
+#
+# Continuous deployment: because Render tracks this repository via its public Git URL rather than
+# the GitHub App, copy each service's Deploy Hook URL from Render -> Settings -> Deploy Hook into
+# GitHub Actions repository secrets (RENDER_AI_DEPLOY_HOOK_URL and RENDER_API_DEPLOY_HOOK_URL).
+# `.github/workflows/cd.yml` triggers both hooks automatically after CI passes on `main`.
 services:
   # BullMQ's queues. `noeviction` matters: an evicted job is a reminder that never goes out.
   - type: keyvalue

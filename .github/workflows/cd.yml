@@ -1,0 +1,71 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-render:
+    name: Trigger Render services
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Trigger fastrev-ai deploy hook
+        env:
+          HOOK_URL: ${{ secrets.RENDER_AI_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "RENDER_AI_DEPLOY_HOOK_URL is not set; skipping fastrev-ai deploy hook." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          curl -fsSL --retry 3 --retry-delay 5 -X POST "$HOOK_URL" >/dev/null
+          echo "Triggered Render deploy for fastrev-ai." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Trigger fastrev-api deploy hook
+        env:
+          HOOK_URL: ${{ secrets.RENDER_API_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "RENDER_API_DEPLOY_HOOK_URL is not set; skipping fastrev-api deploy hook." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          curl -fsSL --retry 3 --retry-delay 5 -X POST "$HOOK_URL" >/dev/null
+          echo "Triggered Render deploy for fastrev-api." >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-vercel:
+    name: Deploy Next.js frontend to Vercel
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build and deploy with Vercel CLI (when secrets are configured)
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Vercel CLI secrets are not configured; relying on Vercel's Git integration or manual deploy." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          echo "Deployed frontend to Vercel production." >> "$GITHUB_STEP_SUMMARY"

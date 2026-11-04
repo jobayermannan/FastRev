@@ -46,21 +46,21 @@ The whole system runs end to end: API, prediction service, trained model, backgr
 | Patients module (CRUD, admin enrollment, risk profile) | ✅ Done |
 | Doctors module (admin-only account + profile management) | ✅ Done |
 | Appointments module (double-booking prevention, status flow) | ✅ Done |
-| No-show prediction service (FastAPI + trained XGBoost) | ✅ Done |
+| No-show prediction service (FastAPI + trained XGBoost + counterfactual `reason_codes`) | ✅ Done |
 | Notification worker (reminder scheduling, retry queues) | ✅ Done |
 | Unit / API tests (Vitest, unittest) | ✅ Done |
-| Frontend tests (Vitest + Testing Library, 37 tests) | ✅ Done |
+| Frontend tests (Vitest + Testing Library, 41 tests) | ✅ Done |
 | End-to-end verification against live MySQL + Redis | ✅ Done (68 checks) |
 | Frontend (Next.js App Router dashboard: login, dashboard, appointments, patients, doctors) | ✅ Done |
 | CI (GitHub Actions: backend, AI service, frontend, workers) | ✅ Done |
-| Real SMS provider adapter (only a `console` provider exists) | ⏳ Planned |
+| SMS provider adapters (`console` default + `twilio` REST adapter + signed inbound `1`/`2` reply webhook) | ✅ Done |
 | Deployed (Vercel + Render + Aiven, free tiers) | ✅ Done |
-| Deployment (CD) | ⏳ Planned |
+| Continuous deployment (`.github/workflows/cd.yml` for Render deploy hooks + Vercel) | ✅ Done |
 
 Two things to be explicit about:
 
-- **The model's metrics are from synthetic data only.** The current XGBoost run scores F1 0.42 / ROC-AUC 0.69 on 12,000 generated rows ([`docs/model-evaluation.md`](docs/model-evaluation.md)). That is a working pipeline, not a claim about clinical accuracy.
-- **No real SMS is sent.** Reminders are scheduled, queued and "delivered" through a `console` provider that only logs them, until a real provider is chosen.
+- **The model's metrics are from synthetic data only.** The current XGBoost run scores F1 `0.4233` / ROC-AUC `0.6945` / PR-AUC `0.4195` (2.12x lift over base rate, Brier `0.1420`) on 12,000 generated rows ([`docs/model-evaluation.md`](docs/model-evaluation.md)). That is a working pipeline, not a claim about clinical accuracy.
+- **The public demo keeps `SMS_PROVIDER=console` ($0/month).** Setting `SMS_PROVIDER=twilio` with Twilio credentials switches delivery to the Twilio Messages REST API and enables HMAC-verified inbound replies (`1` to confirm, `2` to cancel).
 
 See [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md) for the full architecture, database schema, and build order, and [`docs/adr/`](docs/adr) for the reasoning behind major technical decisions.
 
@@ -114,6 +114,7 @@ All protected routes take `Authorization: Bearer <token>`.
 | `GET` | `/api/v1/appointments/:id` | admin |
 | `PATCH` | `/api/v1/appointments/:id/status` | admin |
 | `POST` | `/api/v1/appointments/:id/prediction/retry` | admin |
+| `POST` | `/api/v1/notifications/webhooks/sms` | Twilio HMAC-signed |
 | `GET` | `/health` | public |
 
 The AI service exposes `GET /health` and `POST /predict/no-show-risk` on its own container — internal to the Compose network, not published to the host.
@@ -199,6 +200,7 @@ cd workers && npm run typecheck && npm run build
 cd ai-service
 python training/generate_synthetic_data.py --output data/synthetic_no_show_data.csv
 python training/train.py --data data/synthetic_no_show_data.csv --model-output models/no_show_model.joblib --metrics-output models/training-metrics.json
+python training/evaluate.py --data data/synthetic_no_show_data.csv --output ../docs/model-evaluation.md
 ```
 
 ## A Note on How This Was Built
