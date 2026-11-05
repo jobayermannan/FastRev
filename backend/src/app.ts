@@ -9,6 +9,7 @@ import authRoutes from './modules/auth/auth.routes';
 import patientsRoutes from './modules/patients/patients.routes';
 import doctorsRoutes from './modules/doctors/doctors.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
+import notificationsRoutes from './modules/notifications/notifications.routes';
 import { env } from './common/config/env';
 import { logger } from './common/logger';
 
@@ -16,7 +17,8 @@ export function createApp() {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: true, credentials: true }));
+  const allowedOrigins = env.CORS_ORIGIN?.split(',').map((origin) => origin.trim()).filter(Boolean);
+  app.use(cors({ origin: allowedOrigins?.length ? allowedOrigins : true, credentials: true }));
   app.use(requestId);
   app.use(morgan('combined'));
   app.use(express.json());
@@ -26,6 +28,7 @@ export function createApp() {
   app.use('/api/v1/patients', patientsRoutes);
   app.use('/api/v1/doctors', doctorsRoutes);
   app.use('/api/v1/appointments', appointmentsRoutes);
+  app.use('/api/v1/notifications', notificationsRoutes);
 
   app.get('/health', (_req, res) => {
     res.json({ success: true, data: { status: 'ok', env: env.NODE_ENV } });

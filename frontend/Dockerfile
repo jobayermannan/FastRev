@@ -1,19 +1,30 @@
-FROM node:22-alpine AS builder
-
+FROM node:22-alpine AS deps
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci
 
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Vite inlines this at build time, so it must be a build argument rather than a runtime variable.
-ARG VITE_API_URL=http://localhost:4000/api/v1
-ENV VITE_API_URL=$VITE_API_URL
+# NEXT_PUBLIC_* values are inlined into the browser bundle at build time, so this is a build argument.
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/dist /usr/share/nginx/html
+RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-EXPOSE 80
+USER nextjs
+EXPOSE 3000
+CMD ["node", "server.js"]

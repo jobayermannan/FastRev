@@ -20,6 +20,17 @@ async function main() {
   const existing = await prisma.user.findUnique({ where: { email: parsed.email } });
   if (existing) {
     if (existing.role !== 'admin') throw new Error('Bootstrap email belongs to a non-admin user');
+    if (process.env.BOOTSTRAP_ADMIN_SYNC_PASSWORD === 'true') {
+      const matches = await bcrypt.compare(parsed.password, existing.passwordHash);
+      if (!matches) {
+        await prisma.user.update({
+          where: { id: existing.id },
+          data: { passwordHash: await bcrypt.hash(parsed.password, 12) },
+        });
+        logger.info('Bootstrap admin password synchronized');
+        return;
+      }
+    }
     logger.info('Bootstrap admin already exists');
     return;
   }

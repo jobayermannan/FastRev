@@ -1,0 +1,80 @@
+# Render Blueprint, on free plans.
+#
+# What that costs the architecture: Render has no free background worker, so the API runs the
+# BullMQ consumers in its own process (RUN_WORKERS_IN_PROCESS). Compose still runs them as their
+# own container, and moving them back here is one service block and a plan change. Free web
+# services also sleep after 15 minutes idle, so the first request after a quiet spell is slow and
+# nothing is consumed from the queues while the API is asleep.
+#
+# Not here, on purpose:
+#   - MySQL. Render has no managed MySQL, so the database is an external managed instance
+#     (TiDB Cloud Starter) and its URL is supplied through DATABASE_URL at deploy time.
+#   - The frontend. It is a Next.js app and belongs on Vercel, which builds it natively;
+#     the browser calls this API directly, so the two only meet through CORS_ORIGIN.
+#
+# Continuous deployment: the fastrev-api and fastrev-ai services are connected to this GitHub
+# repository in Render and track `main` with Auto-Deploy enabled. Vercel separately tracks `main`
+# with `frontend/` as its project root. No deploy-hook or Vercel tokens are required in GitHub.
+services:
+  # BullMQ's queues. `noeviction` matters: an evicted job is a reminder that never goes out.
+  - type: keyvalue
+    name: fastrev-redis
+    plan: free
+    region: singapore
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  - type: web
+    name: fastrev-ai
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./ai-service/Dockerfile
+    dockerContext: ./ai-service
+    healthCheckPath: /health
+    envVars:
+      # Pinned so the API can address this service on the private network at a known port.
+      - key: PORT
+        value: 10000
+      - key: MODEL_PATH
+        value: /app/models/no_show_model.joblib
+
+  - type: web
+    name: fastrev-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # No free background worker exists, so the queues run here. See the note at the top.
+      - key: RUN_WORKERS_IN_PROCESS
+        value: 'true'
+      # The TiDB Cloud MySQL-compatible database; configure its connection string in Render.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY
+        value: 24h
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: fastrev-redis
+          property: connectionString
+      # Private network address, which is why fastrev-ai pins its PORT.
+      - key: AI_SERVICE_URL
+        value: http://fastrev-ai:10000
+      # Both stable Vercel aliases: the project one is what the Vercel dashboard links to, and
+      # a browser on it is blocked by any list that names only the other. Unset would reflect
+      # any origin, which this service must never do: it holds real sessions.
+      - key: CORS_ORIGIN
+        value: https://fastrev.vercel.app,https://fastrev-jobayermannans-projects.vercel.app
+      # Creates the first admin on boot if no user owns the address. Set both or neither.
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false

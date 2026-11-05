@@ -47,6 +47,15 @@ export const errorHandler = (
   }
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (['P1001', 'P1002', 'P1008', 'P1017'].includes(err.code)) {
+      logger.warn({ reqId: requestId, prismaCode: err.code }, 'Database unreachable');
+      const message = 'The database is waking up. Try again in a moment.';
+      return res.status(503).json({
+        success: false,
+        message,
+        error: { code: '503', details: message },
+      });
+    }
     const status = err.code === 'P2025' ? 404 : err.code === 'P2002' || err.code === 'P2003' ? 409 : null;
     if (status !== null) {
       const message = status === 404 ? 'Resource not found' : 'Resource conflict';
@@ -57,6 +66,18 @@ export const errorHandler = (
         error: { code: String(status), details: message },
       });
     }
+  }
+
+  // The managed database powers down when idle and takes a while to come back, so an
+  // unreachable database is a wait, not a fault: say so rather than returning a bare 500.
+  if (err instanceof Prisma.PrismaClientInitializationError) {
+    logger.warn({ reqId: requestId, prismaCode: err.errorCode }, 'Database unreachable');
+    const message = 'The database is waking up. Try again in a moment.';
+    return res.status(503).json({
+      success: false,
+      message,
+      error: { code: '503', details: message },
+    });
   }
 
   const parserError = err as Error & { type?: string };

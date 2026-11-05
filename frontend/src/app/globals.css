@@ -1,0 +1,190 @@
+@import 'tailwindcss';
+
+/*
+  Tokens are the Airtable system in ./DESIGN.md, mapped for an Operate surface.
+  What carries over: white canvas, near-black primary, hairline borders, 14px/400 body,
+  weight 400-500 only, 4px spacing base, colour-block-first depth.
+  What does not: the 96px marketing band rhythm and the full-bleed signature cards —
+  those belong to a long-scroll explainer, not to a clinic's working screen. The signature
+  palette survives as the status vocabulary instead.
+*/
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+
+  --color-ink: #181d26;
+  --color-ink-press: #0d1218;
+  --color-body: #333840;
+  --color-muted: #41454d;
+  --color-hairline: #dddddd;
+  --color-border-strong: #9297a0;
+
+  --color-canvas: #ffffff;
+  --color-surface-soft: #f8fafc;
+  --color-surface-strong: #e0e2e6;
+  --color-surface-dark: #181d26;
+
+  --color-link: #1b61c9;
+  --color-link-active: #1a3866;
+  --color-info: #254fad;
+  --color-info-border: #458fff;
+  --color-success: #006400;
+  --color-success-border: #39bf45;
+
+  --color-coral: #aa2d00;
+  --color-forest: #0a2e0e;
+  --color-cream: #f5e9d4;
+  --color-peach: #fcab79;
+  --color-mint: #a8d8c4;
+  --color-mustard: #d9a441;
+
+  --radius-xs: 2px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+
+  /* A fixed product scale, not the marketing display sizes: steps of ~1.15. */
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.45;
+  --text-label: 1rem;
+  --text-label--line-height: 1.4;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.4;
+  --text-section: 1.5rem;
+  --text-section--line-height: 1.35;
+  --text-page: 2rem;
+  --text-page--line-height: 1.2;
+  --text-figure: 3rem;
+  --text-figure--line-height: 1;
+}
+
+@layer base {
+  html {
+    /* The system never ships a display face, so the whole UI runs one family. */
+    font-family: var(--font-sans);
+  }
+
+  body {
+    @apply bg-canvas text-body antialiased;
+    font-size: var(--text-body);
+    line-height: 1.45;
+  }
+
+  /* Browser surfaces belong to the design system too. */
+  ::selection { @apply bg-cream text-ink; }
+  :focus-visible { outline: 2px solid var(--color-info-border); outline-offset: 2px; }
+  * { scrollbar-color: var(--color-border-strong) transparent; scrollbar-width: thin; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-hairline);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: var(--color-border-strong); }
+
+  /* Display weight stays 400: emphasis comes from size and colour, never from bold. */
+  h1 { font-size: var(--text-page); line-height: 1.2; @apply font-normal text-ink; }
+  h2 { font-size: var(--text-section); line-height: 1.35; letter-spacing: 0.12px; @apply font-normal text-ink; }
+  h3 { font-size: var(--text-body); line-height: 1.45; @apply font-medium text-ink; }
+
+  a { @apply text-link underline-offset-2 hover:text-link-active; }
+
+  table { @apply w-full text-left; font-size: var(--text-body); }
+  th {
+    @apply border-b border-hairline px-3 py-2.5 text-left font-medium text-muted;
+    font-size: 0.8125rem;
+    letter-spacing: 0.16px;
+  }
+  td { @apply border-b border-hairline px-3 py-3.5 align-middle text-body; }
+  tbody tr:last-child td { @apply border-b-0; }
+  /* A row is the unit a person tracks across the width, so the whole row answers the pointer. */
+  tbody tr:hover td { @apply bg-surface-soft; }
+  /* The outer columns sit flush with the card's own padding, so the grid starts where the card does. */
+  th:first-child, td:first-child { @apply pl-0; }
+  th:last-child, td:last-child { @apply pr-0; }
+
+  /* Counts, rates and times are read in columns, so their digits have to line up. */
+  td, .tnum { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+  /* Depth is colour-block first: a hairline, never a shadow. */
+  .card { @apply rounded-md border border-hairline bg-canvas p-6; }
+  .panel { @apply rounded-md bg-surface-soft p-6; }
+
+  /*
+    The system's brand voltage is a full-bleed signature surface, not an accent on a small element.
+    On a working screen it earns its place once per page: the band carries what the staff member
+    has to act on, and the canvas resets under it.
+  */
+  /* The two variants repeat the box rules rather than @apply .band: a component class is not a
+     utility in Tailwind v4, so composing them that way fails the build. */
+  .band, .band-dark, .band-cream { @apply rounded-lg px-6 py-8 sm:px-10 sm:py-10; }
+  .band-dark { @apply bg-surface-dark text-canvas; }
+  .band-cream { @apply bg-cream text-ink; }
+  .band-dark a { @apply text-canvas; }
+  /* On a dark surface, secondary text is tinted from the surface, never grey. */
+  .band-dark .meta { color: #9aa3b0; }
+  .band-cream .meta { color: #7a6b52; }
+
+  .field { @apply flex flex-col gap-1.5 text-body font-medium text-ink; }
+
+  .input {
+    @apply w-full rounded-sm border border-hairline bg-canvas px-4 text-body font-normal text-ink
+      outline-none transition-colors;
+    min-height: 44px;
+  }
+  .input:hover { @apply border-border-strong; }
+  .input:focus { @apply border-info-border; outline: 2px solid var(--color-info-border); outline-offset: -1px; }
+  .input::placeholder { @apply text-muted; }
+  .input:disabled { @apply bg-surface-soft text-muted; }
+  select.input { @apply pr-9; }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border px-6 text-label font-medium
+      transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    min-height: 44px;
+  }
+  .btn-sm {
+    @apply rounded-sm px-3 text-body;
+    min-height: 32px;
+  }
+  .btn-primary { @apply border-ink bg-ink text-canvas hover:bg-ink-press hover:border-ink-press; }
+  .btn-secondary { @apply border-hairline bg-canvas text-ink hover:border-border-strong; }
+  .btn-secondary:disabled { @apply border-border-strong; }
+  .btn-danger { @apply border-hairline bg-canvas text-coral hover:border-coral; }
+  .btn-success { @apply border-hairline bg-canvas text-success hover:border-success; }
+  .btn-quiet { @apply border-transparent bg-transparent px-2 text-muted hover:text-ink; }
+
+  /* Badges: a hairline outline by default, filled only where the state must interrupt. */
+  .badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-sm border px-2 py-0.5 font-medium;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+  .badge-neutral { @apply border-hairline bg-canvas text-muted; }
+  .badge-info { @apply border-info-border bg-canvas text-info; }
+  .badge-success { @apply border-success-border bg-canvas text-success; }
+  .badge-quiet { @apply border-transparent bg-surface-strong text-muted; }
+  .badge-alert { @apply border-coral bg-coral text-canvas; }
+  .badge-attention { @apply border-peach bg-peach text-ink; }
+  .badge-new { @apply border-cream bg-cream text-ink; }
+
+  .muted { @apply text-muted; }
+  .meta { @apply text-muted; font-size: 0.8125rem; line-height: 1.35; }
+
+  /* Loading shows the shape of the content that is coming, not a spinner over nothing. */
+  .skeleton {
+    @apply block rounded-xs bg-surface-strong;
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; }
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}

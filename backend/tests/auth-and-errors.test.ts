@@ -128,4 +128,36 @@ describe('HTTP error responses', () => {
     expect(missing.status).toBe(404);
     expect(conflict.status).toBe(409);
   });
+
+  it('maps an unreachable database to 503, not 500', async () => {
+    // The managed instance powers down when idle; a caller should be told to wait, not that
+    // the server is broken.
+    mockPrisma.patient.findMany.mockRejectedValue(new Prisma.PrismaClientInitializationError(
+      "Can't reach database server", '5.22.0', 'P1001',
+    ));
+
+    const res = await request(app).get('/api/v1/patients')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`);
+
+    expect(res.status).toBe(503);
+    expect(res.body.message).toMatch(/waking up/i);
+  });
+
+  it('maps database timeouts and initialization errors without an errorCode to 503', async () => {
+    mockPrisma.patient.findMany.mockRejectedValueOnce(new Prisma.PrismaClientInitializationError(
+      'Connection terminated unexpectedly', '5.22.0',
+    ));
+    const initRes = await request(app).get('/api/v1/patients')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`);
+
+    mockPrisma.patient.findMany.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError(
+      'Timed out', { code: 'P1002', clientVersion: '5.22.0' },
+    ));
+    const timeoutRes = await request(app).get('/api/v1/patients')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`);
+
+    expect(initRes.status).toBe(503);
+    expect(timeoutRes.status).toBe(503);
+    expect(timeoutRes.body.error.code).toBe('503');
+  });
 });

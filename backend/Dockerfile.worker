@@ -26,4 +26,4 @@ RUN npx prisma generate
 
 ENV NODE_ENV=production
 
-CMD ["node", "dist/worker/notification.worker.js"]
+CMD ["node", "dist/worker/index.js"]

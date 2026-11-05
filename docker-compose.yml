@@ -43,6 +43,7 @@ services:
       - AI_SERVICE_URL=${AI_SERVICE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRY=${JWT_EXPIRY}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
       - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-}
       - BOOTSTRAP_ADMIN_PASSWORD=${BOOTSTRAP_ADMIN_PASSWORD:-}
     depends_on:
@@ -90,9 +91,9 @@ services:
       dockerfile: Dockerfile
       args:
         # The browser calls the API directly, so this is the host-facing address, not the internal one.
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/api/v1}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}
     ports:
-      - "3000:80"
+      - "3000:3000"
     depends_on:
       - backend
     restart: unless-stopped
@@ -100,3 +101,4 @@ services:
 volumes:
   mysql-data:
   redis-data:
+

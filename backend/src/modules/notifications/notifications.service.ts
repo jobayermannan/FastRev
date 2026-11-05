@@ -106,7 +106,7 @@ export async function deliverNotification(notificationId: string) {
   try {
     const delivery = await getSmsProvider().send({
       to: notification.appointment.patient.phone,
-      body: `FastRev reminder: ${notification.appointment.patient.name}, you have an appointment at ${notification.appointment.scheduledAt.toISOString()}.`,
+      body: `FastRev reminder: ${notification.appointment.patient.name}, you have an appointment at ${notification.appointment.scheduledAt.toISOString()}. Reply 1 to confirm or 2 to cancel.`,
     });
     await prisma.notification.update({
       where: { id: notification.id },

@@ -1,6 +1,11 @@
 node_modules
 dist
 build
+.next
+out
+.turbo
+.vercel
+next-env.d.ts
 .env
 .env.local
 .env.*.local
@@ -9,9 +14,16 @@ build
 coverage
 .vscode
 .idea
+.venv
+venv
 ai-service/data/*.csv
 ai-service/models/*.joblib
 ai-service/models/*.json
 __pycache__/
 *.pyc
 *.tsbuildinfo
+
+# A one-off `npm audit --json` dump, and a stray duplicate of the Prisma schema that
+# nothing reads; the real one is backend/prisma/schema.prisma.
+audit.json
+backend/src/prisma/
