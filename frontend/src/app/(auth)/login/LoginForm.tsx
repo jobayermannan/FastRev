@@ -16,7 +16,21 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [roleError, setRoleError] = useState<string | null>(null);
   const [slowStart, setSlowStart] = useState(false);
+  const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null);
   const user = auth.status === 'ready' ? auth.session?.user : undefined;
+
+  function copyToClipboard(text: string, field: 'email' | 'password') {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    }
+  }
+
+  function fillDemo() {
+    setEmail('demo@fastrev.app');
+    setPassword('Demo1234!');
+  }
 
   useEffect(() => {
     if (user) router.replace(homeFor(user.role));
@@ -52,6 +66,44 @@ export function LoginForm() {
       <span className="mb-10 block lg:hidden"><BrandMark large /></span>
       <h1>Sign in</h1>
       <p className="muted mt-2">Manage patients, appointments and no-show risk.</p>
+
+      <div className="mt-6 rounded-md border border-hairline bg-surface-soft p-3.5 text-xs">
+        <div className="flex items-center justify-between font-medium text-muted">
+          <span className="font-semibold uppercase tracking-wider text-[11px] text-muted">Demo Credentials</span>
+          <button
+            type="button"
+            onClick={fillDemo}
+            className="font-semibold text-link hover:underline cursor-pointer"
+          >
+            ⚡ 1-Click Auto Fill
+          </button>
+        </div>
+        <div className="mt-2.5 flex flex-col gap-1.5 font-mono text-[13px]">
+          <div className="flex items-center justify-between rounded border border-hairline bg-canvas px-2.5 py-1.5">
+            <span className="text-body select-all">demo@fastrev.app</span>
+            <button
+              type="button"
+              onClick={() => copyToClipboard('demo@fastrev.app', 'email')}
+              className="ml-2 font-sans text-xs text-link hover:underline cursor-pointer"
+            >
+              {copiedField === 'email' ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+          <div className="flex items-center justify-between rounded border border-hairline bg-canvas px-2.5 py-1.5">
+            <span className="text-body select-all">Demo1234!</span>
+            <button
+              type="button"
+              onClick={() => copyToClipboard('Demo1234!', 'password')}
+              className="ml-2 font-sans text-xs text-link hover:underline cursor-pointer"
+            >
+              {copiedField === 'password' ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+        <p className="mt-2 font-sans text-[11px] text-muted">
+          Recruiter access with pre-seeded clinic data and prediction scoring.
+        </p>
+      </div>
 
       <form className="mt-8 flex flex-col gap-5" onSubmit={submit}>
         <label className="field">
