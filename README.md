@@ -6,26 +6,39 @@
 
 ## Live demo
 
-| | |
+| Service | Live URL |
 |---|---|
-| Dashboard | https://fastrev.vercel.app |
-| API | https://fastrev-api.onrender.com/health |
+| Next.js dashboard | [fastrev.vercel.app](https://fastrev.vercel.app) |
+| API health check | [fastrev-api.onrender.com/health](https://fastrev-api.onrender.com/health) |
+| Prediction service health check | [fastrev-ai.onrender.com/health](https://fastrev-ai.onrender.com/health) |
 
 Sign in as `demo@fastrev.app`. The password is in the repository's release notes.
 
-Everything runs on free tiers, which shapes what you will see: the API and the
-prediction service sleep after 15 minutes of inactivity, so **the first request after
-a quiet spell takes 30-60 seconds** while they and the database wake up. The
-no-show model is trained on synthetic data, and the SMS provider is the `console`
-adapter — reminders are scheduled and recorded, not sent to a phone.
+The API and prediction service currently use Render free instances. They can sleep
+after inactivity, so **the first request after a quiet spell can take 30-60 seconds**.
+The TiDB Cloud database remains independently available. The no-show model is
+trained on synthetic data, and the SMS provider is the `console` adapter — reminders
+are scheduled and recorded, not sent to a phone.
 
 Where each piece runs, and why:
 
 | Piece | Host | Why there |
 |---|---|---|
-| Next.js dashboard | Vercel | Builds it natively |
+| Next.js dashboard | Vercel | Native Next.js builds and production aliases |
 | API, prediction service, Valkey | Render (Singapore) | Blueprint in `render.yaml` |
-| MySQL | Aiven (Bangalore) | Render has no managed MySQL |
+| MySQL-compatible database | TiDB Cloud Starter (Tokyo) | Serverless MySQL compatibility for Prisma |
+
+### Continuous deployment
+
+Production deploys track the `main` branch:
+
+- Vercel is connected to this GitHub repository with `frontend/` as its Root Directory.
+  Every push to `main` creates a production frontend deployment.
+- Render tracks `main` for the API and prediction services with Auto-Deploy enabled.
+  A push to `main` rebuilds the affected Docker services.
+- GitHub Actions runs the backend, frontend, worker, and AI test suites on every pull
+  request and push to `main`. Vercel and Render then handle deployment through their
+  native Git integrations, so no production tokens are stored in GitHub Actions.
 
 Render's free tier has no background worker, so the API runs the BullMQ consumers
 in its own process (`RUN_WORKERS_IN_PROCESS=true`). Compose and any paid plan keep
@@ -54,8 +67,8 @@ The whole system runs end to end: API, prediction service, trained model, backgr
 | Frontend (Next.js App Router dashboard: login, dashboard, appointments, patients, doctors) | ✅ Done |
 | CI (GitHub Actions: backend, AI service, frontend, workers) | ✅ Done |
 | SMS provider adapters (`console` default + `twilio` REST adapter + signed inbound `1`/`2` reply webhook) | ✅ Done |
-| Deployed (Vercel + Render + Aiven, free tiers) | ✅ Done |
-| Continuous deployment (`.github/workflows/cd.yml` for Render deploy hooks + Vercel) | ✅ Done |
+| Deployed (Vercel + Render + TiDB Cloud) | ✅ Done |
+| Continuous deployment (Vercel Git integration + Render Auto-Deploy from `main`) | ✅ Done |
 
 Two things to be explicit about:
 

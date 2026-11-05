@@ -58,7 +58,7 @@ Blueprint: [render.yaml](render.yaml). Render service id for the API: `srv-dbl23
 ### Render — `fastrev-api`
 Declared in [render.yaml](render.yaml). Three are `sync: false`, set in the Render dashboard and never committed:
 
-- `DATABASE_URL` — Aiven MySQL connection string with `?sslaccept=accept_invalid_certs`
+- `DATABASE_URL` — TiDB Cloud MySQL-compatible connection string (currently using `?sslaccept=accept_invalid_certs` on Render pending CA hardening)
 - `BOOTSTRAP_ADMIN_EMAIL`
 - `BOOTSTRAP_ADMIN_PASSWORD` (optional `BOOTSTRAP_ADMIN_SYNC_PASSWORD=true` synchronizes an existing admin's password on boot)
 
@@ -71,9 +71,10 @@ Optional when switching from console logging (`SMS_PROVIDER=console`) to live SM
 ### Vercel
 `NEXT_PUBLIC_API_URL` → `https://fastrev-api.onrender.com/api/v1` (inlined at build time).
 
-### GitHub Actions Secrets (for `.github/workflows/cd.yml`)
-- `RENDER_AI_DEPLOY_HOOK_URL` and `RENDER_API_DEPLOY_HOOK_URL` (from Render → Service → Settings → Deploy Hook)
-- Optional `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (if deploying Vercel via GitHub Actions rather than Vercel's Git integration)
+### Deployment integrations
+- Vercel is connected directly to `jobayermannan/FastRev`, tracks `main`, and uses `frontend/` as the project Root Directory.
+- Render's `fastrev-api` and `fastrev-ai` services are connected directly to the same repository and track `main` with Auto-Deploy enabled.
+- GitHub Actions stores no production deployment tokens; `.github/workflows/ci.yml` remains the test/build workflow.
 
 ---
 
@@ -84,7 +85,7 @@ Optional when switching from console logging (`SMS_PROVIDER=console`) to live SM
 - **Model evaluation (`ai-service/training/evaluate.py` + `docs/model-evaluation.md`):** Automated baseline comparison across prevalence floor, smoothed history heuristic, `rule-v1` (both emergency `0.50` and validation-tuned), balanced logistic regression, and `xgboost-v1` (ROC-AUC, PR-AUC, Brier calibration, confusion matrices, returning-patient API cohort, operating-threshold sweep, and gain importances).
 - **Explainable risk reason codes:** Implemented counterfactual marginal lift `reason_codes` in `ai-service/app/main.py` and persisted them through `backend/src/modules/predictions/predictions.service.ts` into `Prediction.reasonCodes` for `RiskBadge`.
 - **Real SMS provider & inbound reply webhook:** Added `TwilioSmsProvider` (`SMS_PROVIDER=twilio`) with fail-fast Zod config validation and `POST /api/v1/notifications/webhooks/sms` with HMAC-SHA1 `X-Twilio-Signature` verification (`1` confirms, `2` cancels and frees the slot).
-- **Continuous deployment:** Added `.github/workflows/cd.yml` triggered after `CI` succeeds on `main` (plus `workflow_dispatch`).
+- **Continuous deployment:** Vercel and both Render web services now track `main` through native Git integrations; the obsolete token/deploy-hook workflow was removed.
 
 ---
 

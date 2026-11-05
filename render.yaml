@@ -8,14 +8,13 @@
 #
 # Not here, on purpose:
 #   - MySQL. Render has no managed MySQL, so the database is an external managed instance
-#     (Aiven's free MySQL tier) and its URL is pasted into DATABASE_URL at deploy time.
+#     (TiDB Cloud Starter) and its URL is supplied through DATABASE_URL at deploy time.
 #   - The frontend. It is a Next.js app and belongs on Vercel, which builds it natively;
 #     the browser calls this API directly, so the two only meet through CORS_ORIGIN.
 #
-# Continuous deployment: because Render tracks this repository via its public Git URL rather than
-# the GitHub App, copy each service's Deploy Hook URL from Render -> Settings -> Deploy Hook into
-# GitHub Actions repository secrets (RENDER_AI_DEPLOY_HOOK_URL and RENDER_API_DEPLOY_HOOK_URL).
-# `.github/workflows/cd.yml` triggers both hooks automatically after CI passes on `main`.
+# Continuous deployment: the fastrev-api and fastrev-ai services are connected to this GitHub
+# repository in Render and track `main` with Auto-Deploy enabled. Vercel separately tracks `main`
+# with `frontend/` as its project root. No deploy-hook or Vercel tokens are required in GitHub.
 services:
   # BullMQ's queues. `noeviction` matters: an evicted job is a reminder that never goes out.
   - type: keyvalue
@@ -54,7 +53,7 @@ services:
       # No free background worker exists, so the queues run here. See the note at the top.
       - key: RUN_WORKERS_IN_PROCESS
         value: 'true'
-      # The managed MySQL instance; paste its connection string when creating the blueprint.
+      # The TiDB Cloud MySQL-compatible database; configure its connection string in Render.
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
