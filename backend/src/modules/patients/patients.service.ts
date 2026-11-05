@@ -120,7 +120,7 @@ export async function getPatientRiskProfile(id: string) {
         id: true,
         scheduledAt: true,
         status: true,
-        prediction: { select: { noShowProbability: true, riskLevel: true, modelVersion: true } },
+        prediction: { select: { noShowProbability: true, riskLevel: true, reasonCodes: true, modelVersion: true } },
       },
     }),
   ]);

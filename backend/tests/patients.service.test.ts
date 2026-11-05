@@ -78,7 +78,7 @@ describe('patients.service', () => {
     mockPrisma.appointment.findMany.mockResolvedValue([
       {
         id: 'future-1', status: 'booked', scheduledAt: new Date(Date.now() + 86_400_000),
-        prediction: { riskLevel: 'high', noShowProbability: 0.71, modelVersion: 'xgboost-v1' },
+        prediction: { riskLevel: 'high', noShowProbability: 0.71, reasonCodes: ['prior_no_show_history'], modelVersion: 'xgboost-v1' },
       },
       { id: 'past-open', status: 'confirmed', scheduledAt: new Date(Date.now() - 3_600_000), prediction: null },
       { id: 'past-1', status: 'completed', scheduledAt: new Date('2024-01-01'), prediction: null },
@@ -91,7 +91,12 @@ describe('patients.service', () => {
       isNewPatient: false, totalAppointments: 11, completed: 6, noShows: 2, noShowRate: 0.25, awaitingOutcome: 1,
     });
     expect(profile.upcomingAppointments.map((a) => a.id)).toEqual(['future-1']);
-    expect(profile.upcomingAppointments[0].prediction?.riskLevel).toBe('high');
+    expect(profile.upcomingAppointments[0].prediction).toMatchObject({ riskLevel: 'high', reasonCodes: ['prior_no_show_history'] });
+    expect(mockPrisma.appointment.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        prediction: { select: { noShowProbability: true, riskLevel: true, reasonCodes: true, modelVersion: true } },
+      }),
+    }));
   });
 
   it('marks a patient with no recorded outcome as new, with no rate', async () => {
