@@ -12,7 +12,11 @@
 | API health check | [fastrev-api.onrender.com/health](https://fastrev-api.onrender.com/health) |
 | Prediction service health check | [fastrev-ai.onrender.com/health](https://fastrev-ai.onrender.com/health) |
 
-Sign in as `demo@fastrev.app`. The password is in the repository's release notes.
+### Demo Access
+Sign in to [fastrev.vercel.app](https://fastrev.vercel.app) with the demo administrator account:
+- **Email:** `demo@fastrev.app`
+- **Password:** `Demo1234!`
+- **Role:** `Admin` (full access to clinic appointments, patient management, and prediction metrics)
 
 The API and prediction service currently use Render free instances. They can sleep
 after inactivity, so **the first request after a quiet spell can take 30-60 seconds**.
