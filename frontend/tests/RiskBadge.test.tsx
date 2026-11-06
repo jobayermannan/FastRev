@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { RiskBadge } from '@/components/RiskBadge';
+import { RiskBadge, StandbyBadge } from '@/components/RiskBadge';
 import type { Prediction } from '@/lib/api/types';
 
 const prediction = (over: Partial<Prediction>): Prediction => ({
@@ -32,5 +32,11 @@ describe('RiskBadge', () => {
   it('puts the reason codes in the tooltip, so a staff member can see why', () => {
     render(<RiskBadge prediction={prediction({ riskLevel: 'high', reasonCodes: ['past_no_shows', 'long_lead_time'] })} />);
     expect(screen.getByTitle(/past_no_shows, long_lead_time/)).toBeInTheDocument();
+  });
+
+  it('renders StandbyBadge with recommendation tooltip for high risk appointments', () => {
+    render(<StandbyBadge probability={0.88} />);
+    expect(screen.getByText('Standby Recommended')).toBeInTheDocument();
+    expect(screen.getByTitle(/Smart Overbooking Recommendation: High no-show probability/)).toBeInTheDocument();
   });
 });

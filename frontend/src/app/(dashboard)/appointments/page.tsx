@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
-import { RiskBadge } from '@/components/RiskBadge';
+import { RiskBadge, StandbyBadge } from '@/components/RiskBadge';
 import { RoleGate } from '@/components/RoleGate';
 import { Callout, EmptyRow, ErrorNote, PageHeader, Pager, SkeletonRows, StatusBadge, TableWrap } from '@/components/ui';
 import { useAppointments } from '@/lib/api/hooks';
@@ -143,6 +143,9 @@ function Appointments() {
             </div>
             <div className="flex flex-wrap gap-1.5">
               <RiskBadge prediction={appointment.prediction} />
+              {appointment.prediction?.riskLevel === 'high' && ['booked', 'confirmed'].includes(appointment.status) && (
+                <StandbyBadge probability={appointment.prediction?.noShowProbability} />
+              )}
               <StatusBadge status={appointment.status} needsOutcome={appointment.needsOutcome} />
             </div>
             <AppointmentActions appointment={appointment} align="start" />
@@ -173,7 +176,14 @@ function Appointments() {
                     {appointment.doctor.user.email}
                     <span className="meta block">{appointment.doctor.specialty}</span>
                   </td>
-                  <td><RiskBadge prediction={appointment.prediction} /></td>
+                  <td>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <RiskBadge prediction={appointment.prediction} />
+                      {appointment.prediction?.riskLevel === 'high' && ['booked', 'confirmed'].includes(appointment.status) && (
+                        <StandbyBadge probability={appointment.prediction?.noShowProbability} />
+                      )}
+                    </div>
+                  </td>
                   <td><StatusBadge status={appointment.status} needsOutcome={appointment.needsOutcome} /></td>
                   {/* Actions keep one row height; the table scrolls rather than stacking buttons. */}
                   <td className="whitespace-nowrap"><AppointmentActions appointment={appointment} /></td>

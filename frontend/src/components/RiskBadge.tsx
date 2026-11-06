@@ -35,3 +35,19 @@ export function RiskBadge({ prediction }: { prediction: Prediction | null }) {
     </span>
   );
 }
+
+/**
+ * Smart Overbooking / Standby Slot Recommendation
+ * Flags high-risk appointment slots so clinic staff can queue a standby patient or allow overbooking.
+ */
+export function StandbyBadge({ probability }: { probability?: number | null }) {
+  const percentText = probability !== null && probability !== undefined ? ` (${Math.round(probability * 100)}%)` : '';
+  return (
+    <span
+      className="badge badge-attention cursor-help"
+      title={`Smart Overbooking Recommendation: High no-show probability${percentText}. Clinic capacity policy recommends queueing a standby patient for this slot to protect revenue.`}
+    >
+      <span aria-hidden="true">⚡</span> Standby Recommended
+    </span>
+  );
+}

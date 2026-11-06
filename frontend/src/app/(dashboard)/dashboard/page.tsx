@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { RiskBadge } from '@/components/RiskBadge';
+import { RiskBadge, StandbyBadge } from '@/components/RiskBadge';
 import { RoleGate } from '@/components/RoleGate';
 import { EmptyRow, ErrorNote, PageHeader, SkeletonRows, StatusBadge, TableWrap } from '@/components/ui';
 import { useAppointments } from '@/lib/api/hooks';
@@ -50,7 +50,7 @@ function Dashboard() {
           figure={highRisk.data?.pagination.total}
           loading={highRisk.isPending}
           title="High risk, still open"
-          body="Predicted to miss their appointment and not confirmed yet. A call now is cheaper than an empty chair."
+          body="Predicted to miss their appointment and not confirmed yet. Smart Overbooking suggests standby patients for these slots to protect clinic capacity."
           href="/appointments?view=upcoming&risk=high"
           action="See them"
           settled="Nothing high-risk is coming up."
@@ -121,7 +121,14 @@ function Worklist({ title, query, href, empty }: {
                     {appointment.doctor.user.email}
                     <span className="meta block">{appointment.doctor.specialty}</span>
                   </td>
-                  <td><RiskBadge prediction={appointment.prediction} /></td>
+                  <td>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <RiskBadge prediction={appointment.prediction} />
+                      {appointment.prediction?.riskLevel === 'high' && ['booked', 'confirmed'].includes(appointment.status) && (
+                        <StandbyBadge probability={appointment.prediction?.noShowProbability} />
+                      )}
+                    </div>
+                  </td>
                   <td><StatusBadge status={appointment.status} needsOutcome={appointment.needsOutcome} /></td>
                 </tr>
               ))}
