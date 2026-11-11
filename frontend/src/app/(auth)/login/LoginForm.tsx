@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { BrandMark, ErrorNote } from '@/components/ui';
+import { API_URL } from '@/lib/api/client';
 import { useLogin } from '@/lib/api/hooks';
 import { homeFor, STAFF_ROLES } from '@/lib/auth/roles';
 import { authStore, useAuth } from '@/lib/auth/store';
@@ -18,6 +19,12 @@ export function LoginForm() {
   const [slowStart, setSlowStart] = useState(false);
   const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null);
   const user = auth.status === 'ready' ? auth.session?.user : undefined;
+
+  useEffect(() => {
+    // Pre-warm the Render backend as soon as the login screen loads
+    const healthUrl = API_URL.replace(/\/api\/v1\/?$/, '/health');
+    fetch(healthUrl, { mode: 'no-cors' }).catch(() => {});
+  }, []);
 
   function copyToClipboard(text: string, field: 'email' | 'password') {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
